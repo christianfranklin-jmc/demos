@@ -9,6 +9,7 @@ from .tools.toolkit_ddl import execute_ddl
 from .tools.toolkit_query import run_query
 from .tools.toolkit_scan import profile_database, scan_metadata
 from .tools.dbt_generate import generate_dbt_project
+from .tools.semantic_layer import generate_semantic_layer
 
 # Default tool set for the Platform Agent
 DEFAULT_TOOLS = [
@@ -18,6 +19,7 @@ DEFAULT_TOOLS = [
     run_query,
     execute_ddl,
     generate_dbt_project,
+    generate_semantic_layer,
 ]
 
 

@@ -28,10 +28,11 @@ src/platform_agent/           # Agent source code
     toolkit_query.py          # @tool run_query (read-only SQL)
     toolkit_ddl.py            # @tool execute_ddl (DROP/TRUNCATE blocked)
     dbt_generate.py           # @tool generate_dbt_project (star schema → dbt)
+    semantic_layer.py         # @tool generate_semantic_layer (MetricFlow YAML)
 docs/adr/                     # Architecture Decision Records (6 ADRs)
 dbt_output/northwinds_dw/     # Generated dbt project (14 models, compiles clean)
 tests/                        # Unit and integration tests
-streamlit_app/                # Streamlit TTYD application (Phase 5)
+streamlit_app/app.py          # Streamlit TTYD app — schema discovery on connect, NL Q&A
 scripts/seed_northwinds.sql   # Northwinds dataset SQL
 toolkit.conf                  # phData Toolkit config (Northwinds RDS datasource)
 ```
@@ -87,8 +88,9 @@ Phases completed:
 - **Phase 3**: Interactive discovery — system prompt enhanced with Discovery Guide, Dimensional Modeling Guide, dbt Standards, and Guardrails
 - **Phase 4**: dbt code generation — `generate_dbt_project` tool produces full dbt project (sources, staging, marts, packages.yml with dbt_utils, schema tests). Northwinds star schema: 8 staging models, 6 marts (fct_order_lines + 5 dims), compiles clean
 
+- **Phase 5**: Semantic layer tool (`generate_semantic_layer` — MetricFlow YAML) + Streamlit TTYD app (schema discovery on connect, NL Q&A with auto-charting). Agent learns schema dynamically — no hardcoded database knowledge.
+
 Next phases:
-- **Phase 5**: Semantic layer + Streamlit TTYD app
 - **Phase 6**: AgentCore deployment
 
 ## dbt Project (Northwinds)
@@ -102,3 +104,11 @@ uv run dbt run --profiles-dir .      # Materialize to RDS
 ```
 
 Note: `profiles.yml` currently has direct credentials for testing. The `generate_dbt_project` tool produces env_var-based profiles by default.
+
+## Streamlit App (Talk To Your Data)
+
+```bash
+uv run streamlit run streamlit_app/app.py --server.port 8501
+```
+
+The app connects to any PostgreSQL database, runs `scan_metadata` to discover the schema, then accepts NL questions. The agent uses `run_query` to answer with actual data. Results are shown as tables + auto-generated bar charts.
