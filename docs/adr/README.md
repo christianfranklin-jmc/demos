@@ -13,6 +13,8 @@ An ADR is a short document that captures a significant architectural or technica
 | [001](001-programming-language.md) | Programming Language | Accepted | 2026-03-20 |
 | [002](002-llm-provider.md) | LLM Provider | Accepted | 2026-03-20 |
 | [003](003-deployment-environment.md) | Deployment Environment | Accepted | 2026-03-20 |
+| [004](004-agent-framework.md) | Agent Framework | Accepted | 2026-03-21 |
+| [005](005-demo-database.md) | Demo Database | Accepted | 2026-03-21 |
 
 ## Template
 
