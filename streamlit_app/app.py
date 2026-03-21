@@ -19,6 +19,65 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from platform_agent.agent import create_agent
 from platform_agent.tools._toolkit_client import connect
 
+
+# ---------------------------------------------------------------------------
+# Helper functions (must be defined before use in Streamlit's top-to-bottom execution)
+# ---------------------------------------------------------------------------
+
+def _extract_text(result) -> str:
+    """Extract text content from agent response."""
+    if hasattr(result, "message"):
+        msg = result.message
+        if hasattr(msg, "content") and isinstance(msg.content, list):
+            texts = [block.get("text", "") for block in msg.content
+                     if isinstance(block, dict) and "text" in block]
+            return "\n".join(texts) if texts else str(result)
+    return str(result)
+
+
+def _extract_query_results(result) -> pd.DataFrame | None:
+    """Extract the last query result from agent tool use."""
+    if not hasattr(result, "message"):
+        return None
+
+    msg = result.message
+    if not hasattr(msg, "content") or not isinstance(msg.content, list):
+        return None
+
+    for block in reversed(msg.content):
+        if isinstance(block, dict) and block.get("type") == "tool_result":
+            content = block.get("content", "")
+            if isinstance(content, str) and '"rows"' in content:
+                try:
+                    import json
+                    data = json.loads(content)
+                    if "rows" in data and data["rows"]:
+                        return pd.DataFrame(data["rows"])
+                except (json.JSONDecodeError, ValueError):
+                    pass
+    return None
+
+
+def _auto_chart(df: pd.DataFrame) -> dict | None:
+    """Determine if data is suitable for auto-charting."""
+    if df is None or df.empty or len(df) > 50 or len(df.columns) < 2:
+        return None
+
+    numeric_cols = df.select_dtypes(include=["number"]).columns.tolist()
+    cat_cols = [c for c in df.columns if c not in numeric_cols]
+
+    if numeric_cols and cat_cols:
+        return {"x": cat_cols[0], "y": numeric_cols[0], "df": df}
+    return None
+
+
+def _render_chart(chart_data: dict) -> None:
+    """Render a bar chart from chart data."""
+    df = chart_data["df"]
+    x, y = chart_data["x"], chart_data["y"]
+    st.bar_chart(df.set_index(x)[y])
+
+
 # ---------------------------------------------------------------------------
 # Page config
 # ---------------------------------------------------------------------------
@@ -172,63 +231,3 @@ if prompt := st.chat_input("Ask a question about your data..."):
                     st.session_state.messages.append(
                         {"role": "assistant", "content": error_msg}
                     )
-
-
-# ---------------------------------------------------------------------------
-# Helper functions
-# ---------------------------------------------------------------------------
-
-def _extract_text(result) -> str:
-    """Extract text content from agent response."""
-    if hasattr(result, "message"):
-        msg = result.message
-        if hasattr(msg, "content") and isinstance(msg.content, list):
-            texts = [block.get("text", "") for block in msg.content
-                     if isinstance(block, dict) and "text" in block]
-            return "\n".join(texts) if texts else str(result)
-    return str(result)
-
-
-def _extract_query_results(result) -> pd.DataFrame | None:
-    """Extract the last query result from agent tool use."""
-    if not hasattr(result, "message"):
-        return None
-
-    msg = result.message
-    if not hasattr(msg, "content") or not isinstance(msg.content, list):
-        return None
-
-    # Walk through content blocks looking for tool results with rows
-    for block in reversed(msg.content):
-        if isinstance(block, dict) and block.get("type") == "tool_result":
-            content = block.get("content", "")
-            if isinstance(content, str) and '"rows"' in content:
-                try:
-                    import json
-                    data = json.loads(content)
-                    if "rows" in data and data["rows"]:
-                        return pd.DataFrame(data["rows"])
-                except (json.JSONDecodeError, ValueError):
-                    pass
-    return None
-
-
-def _auto_chart(df: pd.DataFrame) -> dict | None:
-    """Determine if data is suitable for auto-charting."""
-    if df is None or df.empty or len(df) > 50 or len(df.columns) < 2:
-        return None
-
-    # Find numeric and non-numeric columns
-    numeric_cols = df.select_dtypes(include=["number"]).columns.tolist()
-    cat_cols = [c for c in df.columns if c not in numeric_cols]
-
-    if numeric_cols and cat_cols:
-        return {"x": cat_cols[0], "y": numeric_cols[0], "df": df}
-    return None
-
-
-def _render_chart(chart_data: dict) -> None:
-    """Render a bar chart from chart data."""
-    df = chart_data["df"]
-    x, y = chart_data["x"], chart_data["y"]
-    st.bar_chart(df.set_index(x)[y])
