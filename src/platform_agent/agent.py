@@ -8,6 +8,7 @@ from .tools.toolkit_connect import connect_to_database
 from .tools.toolkit_ddl import execute_ddl
 from .tools.toolkit_query import run_query
 from .tools.toolkit_scan import profile_database, scan_metadata
+from .tools.dbt_generate import generate_dbt_project
 
 # Default tool set for the Platform Agent
 DEFAULT_TOOLS = [
@@ -16,6 +17,7 @@ DEFAULT_TOOLS = [
     profile_database,
     run_query,
     execute_ddl,
+    generate_dbt_project,
 ]
 
 

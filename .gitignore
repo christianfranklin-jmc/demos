@@ -18,9 +18,11 @@ venv/
 *.swo
 
 # dbt
-dbt_output/target/
-dbt_output/dbt_packages/
-dbt_output/logs/
+dbt_output/*/target/
+dbt_output/*/dbt_packages/
+dbt_output/*/logs/
+dbt_output/*/profiles.yml
+dbt_output/*/package-lock.yml
 
 # Streamlit
 streamlit_app/.streamlit/secrets.toml

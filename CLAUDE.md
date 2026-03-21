@@ -27,7 +27,9 @@ src/platform_agent/           # Agent source code
     toolkit_scan.py           # @tool scan_metadata, profile_database
     toolkit_query.py          # @tool run_query (read-only SQL)
     toolkit_ddl.py            # @tool execute_ddl (DROP/TRUNCATE blocked)
+    dbt_generate.py           # @tool generate_dbt_project (star schema → dbt)
 docs/adr/                     # Architecture Decision Records (6 ADRs)
+dbt_output/northwinds_dw/     # Generated dbt project (14 models, compiles clean)
 tests/                        # Unit and integration tests
 streamlit_app/                # Streamlit TTYD application (Phase 5)
 scripts/seed_northwinds.sql   # Northwinds dataset SQL
@@ -82,9 +84,21 @@ Phases completed:
 - **Phase 0**: Project scaffold + ADR log
 - **Phase 1**: Core Strands agent with Bedrock round-trip
 - **Phase 2**: Toolkit integration (5 tools, tested E2E against Northwinds)
+- **Phase 3**: Interactive discovery — system prompt enhanced with Discovery Guide, Dimensional Modeling Guide, dbt Standards, and Guardrails
+- **Phase 4**: dbt code generation — `generate_dbt_project` tool produces full dbt project (sources, staging, marts, packages.yml with dbt_utils, schema tests). Northwinds star schema: 8 staging models, 6 marts (fct_order_lines + 5 dims), compiles clean
 
 Next phases:
-- **Phase 3**: Interactive discovery (NL Q&A over database metadata)
-- **Phase 4**: Dimensional model design + dbt code generation
 - **Phase 5**: Semantic layer + Streamlit TTYD app
 - **Phase 6**: AgentCore deployment
+
+## dbt Project (Northwinds)
+
+```bash
+# Compile / run the generated dbt project
+cd dbt_output/northwinds_dw
+uv run dbt deps --profiles-dir .     # Install dbt_utils
+uv run dbt compile --profiles-dir .  # Verify (14 models, 12 tests, 8 sources)
+uv run dbt run --profiles-dir .      # Materialize to RDS
+```
+
+Note: `profiles.yml` currently has direct credentials for testing. The `generate_dbt_project` tool produces env_var-based profiles by default.
