@@ -208,9 +208,9 @@ echo "RDS available at: $DB_ENDPOINT:$DB_PORT"
 echo ""
 echo "--- Step 6: Seeding Northwinds database ---"
 # Check if data already exists
-ROW_COUNT=$(PGPASSWORD="$DB_PASSWORD" psql \
+ROW_COUNT=$(PGSSLMODE=require PGPASSWORD="$DB_PASSWORD" psql \
     -h "$DB_ENDPOINT" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" \
-    --set=sslmode=require -tAc \
+    -tAc \
     "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE'" \
     2>/dev/null || echo "0")
 
@@ -218,9 +218,8 @@ if [[ "$ROW_COUNT" -gt 5 ]]; then
     echo "Database already seeded ($ROW_COUNT tables found). Skipping."
 else
     echo "Loading seed data..."
-    PGPASSWORD="$DB_PASSWORD" psql \
+    PGSSLMODE=require PGPASSWORD="$DB_PASSWORD" psql \
         -h "$DB_ENDPOINT" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" \
-        --set=sslmode=require \
         -f "$PROJECT_DIR/scripts/seed_northwinds.sql" \
         > /dev/null 2>&1
     echo "Northwinds data loaded."
