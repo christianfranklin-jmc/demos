@@ -4,6 +4,19 @@ from strands import Agent
 
 from .models import DEFAULT_REGION, SONNET_MODEL_ID, create_model
 from .prompts.system import SYSTEM_PROMPT
+from .tools.toolkit_connect import connect_to_database
+from .tools.toolkit_ddl import execute_ddl
+from .tools.toolkit_query import run_query
+from .tools.toolkit_scan import profile_database, scan_metadata
+
+# Default tool set for the Platform Agent
+DEFAULT_TOOLS = [
+    connect_to_database,
+    scan_metadata,
+    profile_database,
+    run_query,
+    execute_ddl,
+]
 
 
 def create_agent(
@@ -20,7 +33,7 @@ def create_agent(
         region: AWS region for the Bedrock service.
         max_tokens: Maximum tokens to generate per response.
         profile_name: AWS CLI profile name for authentication.
-        tools: List of @tool functions to register. Empty list for no tools.
+        tools: List of @tool functions to register. Defaults to all Toolkit tools.
     """
     model = create_model(
         model_id=model_id,
@@ -32,5 +45,5 @@ def create_agent(
     return Agent(
         model=model,
         system_prompt=SYSTEM_PROMPT,
-        tools=tools or [],
+        tools=tools if tools is not None else DEFAULT_TOOLS,
     )

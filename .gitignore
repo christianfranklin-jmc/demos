@@ -28,6 +28,12 @@ streamlit_app/.streamlit/secrets.toml
 # AWS / AgentCore
 .bedrock_agentcore.yaml
 
+# phData Toolkit
+lib/
+logs/
+/tools/
+.toolkit-metadata
+
 # OS
 .DS_Store
 Thumbs.db
