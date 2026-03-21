@@ -20,6 +20,7 @@ src/platform_agent/           # Agent source code
   agent.py                    # Strands Agent factory — create_agent()
   models.py                   # BedrockModel config (Sonnet 4, Opus 4)
   __main__.py                 # Interactive CLI entry point
+  serve.py                    # AgentCore Runtime entry point (AG-UI protocol)
   prompts/system.py           # System prompt (7 capabilities + guardrails)
   tools/
     _toolkit_client.py        # Adapter: Toolkit CLI for scan/profile, psycopg2 for query/DDL
@@ -29,7 +30,7 @@ src/platform_agent/           # Agent source code
     toolkit_ddl.py            # @tool execute_ddl (DROP/TRUNCATE blocked)
     dbt_generate.py           # @tool generate_dbt_project (star schema → dbt)
     semantic_layer.py         # @tool generate_semantic_layer (MetricFlow YAML)
-docs/adr/                     # Architecture Decision Records (6 ADRs)
+docs/adr/                     # Architecture Decision Records (7 ADRs)
 dbt_output/northwinds_dw/     # Generated dbt project (14 models, compiles clean)
 tests/                        # Unit and integration tests
 streamlit_app/app.py          # Streamlit TTYD app — schema discovery on connect, NL Q&A
@@ -89,9 +90,9 @@ Phases completed:
 - **Phase 4**: dbt code generation — `generate_dbt_project` tool produces full dbt project (sources, staging, marts, packages.yml with dbt_utils, schema tests). Northwinds star schema: 8 staging models, 6 marts (fct_order_lines + 5 dims), compiles clean
 
 - **Phase 5**: Semantic layer tool (`generate_semantic_layer` — MetricFlow YAML) + Streamlit TTYD app (schema discovery on connect, NL Q&A with auto-charting). Agent learns schema dynamically — no hardcoded database knowledge.
+- **Phase 6**: AgentCore deployment — `serve.py` entry point with AG-UI protocol adapter. Custom async handler bridges Strands `stream_async` events to AG-UI text events. Auto-connects to DB via env vars.
 
-Next phases:
-- **Phase 6**: AgentCore deployment
+All phases complete.
 
 ## dbt Project (Northwinds)
 
@@ -112,3 +113,20 @@ uv run streamlit run streamlit_app/app.py --server.port 8501
 ```
 
 The app connects to any PostgreSQL database, runs `scan_metadata` to discover the schema, then accepts NL questions. The agent uses `run_query` to answer with actual data. Results are shown as tables + auto-generated bar charts.
+
+## AgentCore Deployment
+
+```bash
+# Local development (requires bedrock-agentcore[ag-ui])
+uv run --extra agentcore python -m platform_agent.serve
+
+# Set DB connection via env vars for auto-connect
+export DB_HOST=platform-agent-northwinds.ciz4texnlef4.us-east-1.rds.amazonaws.com
+export DB_PORT=5432 DB_NAME=northwinds DB_USER=postgres DB_PASSWORD=...
+
+# AgentCore CLI
+agentcore dev    # Local testing
+agentcore launch # Deploy to AgentCore Runtime
+```
+
+The serve.py adapter wraps the Strands agent in the AG-UI protocol. It auto-discovers the database schema on first request if DB env vars are set.
