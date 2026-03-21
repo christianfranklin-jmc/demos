@@ -56,11 +56,10 @@ aws rds delete-db-subnet-group \
 
 # Delete security group
 VPC_ID=$(aws ec2 describe-vpcs \
-    --filters "Name=isDefault,Values=false" \
+    --filters "Name=isDefault,Values=true" \
     --query 'Vpcs[0].VpcId' --output text 2>/dev/null || echo "None")
 if [[ "$VPC_ID" == "None" || -z "$VPC_ID" ]]; then
     VPC_ID=$(aws ec2 describe-vpcs \
-        --filters "Name=isDefault,Values=true" \
         --query 'Vpcs[0].VpcId' --output text)
 fi
 

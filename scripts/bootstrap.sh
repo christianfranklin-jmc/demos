@@ -73,19 +73,76 @@ echo "Instance: $DB_INSTANCE_ID"
 echo ""
 
 # ---------------------------------------------------------------------------
-# Step 1: Find a VPC with public subnets
+# Step 1: Find a VPC with public subnets and internet gateway
 # ---------------------------------------------------------------------------
-echo "--- Step 1: Finding VPC ---"
+echo "--- Step 1: Finding VPC with internet access ---"
+
+# Helper: check if a VPC has an internet gateway attached
+has_igw() {
+    local vpc="$1"
+    local igw
+    igw=$($AWS ec2 describe-internet-gateways \
+        --filters "Name=attachment.vpc-id,Values=$vpc" \
+        --query 'InternetGateways[0].InternetGatewayId' --output text 2>/dev/null)
+    [[ -n "$igw" && "$igw" != "None" ]]
+}
+
+# Try default VPC first (most likely to have internet access)
 VPC_ID=$($AWS ec2 describe-vpcs \
-    --filters "Name=isDefault,Values=false" \
+    --filters "Name=isDefault,Values=true" \
     --query 'Vpcs[0].VpcId' --output text 2>/dev/null || echo "None")
 
 if [[ "$VPC_ID" == "None" || -z "$VPC_ID" ]]; then
+    # No default VPC — pick the first non-default VPC
     VPC_ID=$($AWS ec2 describe-vpcs \
-        --filters "Name=isDefault,Values=true" \
-        --query 'Vpcs[0].VpcId' --output text)
+        --query 'Vpcs[0].VpcId' --output text 2>/dev/null || echo "None")
+fi
+
+if [[ "$VPC_ID" == "None" || -z "$VPC_ID" ]]; then
+    echo "ERROR: No VPC found in region $REGION"
+    exit 1
 fi
 echo "Using VPC: $VPC_ID"
+
+# Ensure VPC has an internet gateway (required for public RDS access)
+IGW_ID=$($AWS ec2 describe-internet-gateways \
+    --filters "Name=attachment.vpc-id,Values=$VPC_ID" \
+    --query 'InternetGateways[0].InternetGatewayId' --output text 2>/dev/null || echo "None")
+
+if [[ "$IGW_ID" == "None" || -z "$IGW_ID" ]]; then
+    echo "No internet gateway found — creating one..."
+    IGW_ID=$($AWS ec2 create-internet-gateway \
+        --query 'InternetGateway.InternetGatewayId' --output text)
+    $AWS ec2 attach-internet-gateway --internet-gateway-id "$IGW_ID" --vpc-id "$VPC_ID"
+    echo "Created and attached IGW: $IGW_ID"
+else
+    echo "Internet gateway: $IGW_ID"
+fi
+
+# Ensure the main route table has a route to the IGW
+MAIN_RTB=$($AWS ec2 describe-route-tables \
+    --filters "Name=vpc-id,Values=$VPC_ID" "Name=association.main,Values=true" \
+    --query 'RouteTables[0].RouteTableId' --output text)
+
+EXISTING_IGW_ROUTE=$($AWS ec2 describe-route-tables \
+    --route-table-ids "$MAIN_RTB" \
+    --query "RouteTables[0].Routes[?GatewayId=='$IGW_ID' && DestinationCidrBlock=='0.0.0.0/0']" \
+    --output text 2>/dev/null)
+
+if [[ -z "$EXISTING_IGW_ROUTE" ]]; then
+    echo "Adding 0.0.0.0/0 route to IGW in main route table..."
+    $AWS ec2 create-route \
+        --route-table-id "$MAIN_RTB" \
+        --destination-cidr-block 0.0.0.0/0 \
+        --gateway-id "$IGW_ID" > /dev/null 2>&1 || \
+    $AWS ec2 replace-route \
+        --route-table-id "$MAIN_RTB" \
+        --destination-cidr-block 0.0.0.0/0 \
+        --gateway-id "$IGW_ID" > /dev/null
+    echo "Route added."
+else
+    echo "IGW route exists in main route table."
+fi
 
 # Get subnets (need at least 2 in different AZs for DB subnet group)
 SUBNET_IDS=$($AWS ec2 describe-subnets \
