@@ -15,6 +15,7 @@ An ADR is a short document that captures a significant architectural or technica
 | [003](003-deployment-environment.md) | Deployment Environment | Accepted | 2026-03-20 |
 | [004](004-agent-framework.md) | Agent Framework | Accepted | 2026-03-21 |
 | [005](005-demo-database.md) | Demo Database | Accepted | 2026-03-21 |
+| [006](006-data-connectivity-layer.md) | Data Connectivity Layer | Accepted | 2026-03-21 |
 
 ## Template
 
