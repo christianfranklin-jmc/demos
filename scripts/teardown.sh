@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# teardown.sh — Remove AWS resources created by bootstrap.sh.
+# teardown.sh — Remove AWS resources created by bootstrap.sh and agentcore launch.
 #
 # Usage:
 #   ./scripts/teardown.sh --profile <AWS_PROFILE> [--region <REGION>]
@@ -30,7 +30,24 @@ export AWS_PROFILE AWS_DEFAULT_REGION="$REGION"
 
 echo "=== Teardown AWS Platform Agent ==="
 
+# ---------------------------------------------------------------------------
+# Destroy AgentCore resources (agent runtime, ECR repo, gateway)
+# ---------------------------------------------------------------------------
+echo "--- AgentCore ---"
+if command -v agentcore &> /dev/null; then
+    echo "Destroying AgentCore resources..."
+    agentcore destroy --force --delete-ecr-repo 2>&1 || echo "AgentCore destroy completed (or no resources found)."
+else
+    echo "agentcore CLI not found. Skipping AgentCore teardown."
+    echo "  Install: uv pip install 'bedrock-agentcore[ag-ui]'"
+    echo "  Then run: agentcore destroy --force --delete-ecr-repo"
+fi
+
+# ---------------------------------------------------------------------------
 # Delete RDS instance (skip final snapshot)
+# ---------------------------------------------------------------------------
+echo ""
+echo "--- RDS ---"
 DB_STATUS=$(aws rds describe-db-instances \
     --db-instance-identifier "$DB_INSTANCE_ID" \
     --query 'DBInstances[0].DBInstanceStatus' --output text 2>/dev/null || echo "not-found")
