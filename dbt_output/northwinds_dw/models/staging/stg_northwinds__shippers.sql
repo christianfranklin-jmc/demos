@@ -1,13 +1,7 @@
-with source as (
-    select * from {{ source('northwinds', 'shippers') }}
-),
+{{ config(materialized='view') }}
 
-renamed as (
-    select
-        shipper_id as shipper_key,
-        company_name as shipper_name,
-        phone as shipper_phone
-    from source
-)
-
-select * from renamed
+select
+    shipper_id,
+    company_name,
+    phone
+from {{ source('northwinds', 'shippers') }}

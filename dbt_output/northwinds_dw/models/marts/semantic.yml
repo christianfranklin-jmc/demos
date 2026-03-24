@@ -1,0 +1,259 @@
+semantic_models:
+- name: fct_order_lines
+  model: ref('fct_order_lines')
+  description: Order line items with product, customer, employee, and date details
+  defaults:
+    agg_time_dimension: order_date
+  entities:
+  - name: order_line
+    type: primary
+    expr: order_line_key
+  - name: order
+    type: foreign
+    expr: order_id
+  - name: product
+    type: foreign
+    expr: product_key
+  - name: customer
+    type: foreign
+    expr: customer_key
+  - name: employee
+    type: foreign
+    expr: employee_key
+  dimensions:
+  - name: order_date
+    type: time
+    expr: order_date_key
+    type_params:
+      time_granularity: day
+  - name: required_date
+    type: time
+    expr: required_date_key
+    type_params:
+      time_granularity: day
+  - name: shipped_date
+    type: time
+    expr: shipped_date_key
+    type_params:
+      time_granularity: day
+  - name: product_name
+    type: categorical
+    expr: product_name
+  - name: category_name
+    type: categorical
+    expr: category_name
+  - name: supplier_name
+    type: categorical
+    expr: supplier_name
+  - name: supplier_country
+    type: categorical
+    expr: supplier_country
+  - name: customer_name
+    type: categorical
+    expr: company_name
+  - name: customer_country
+    type: categorical
+    expr: country
+  - name: employee_name
+    type: categorical
+    expr: employee_name
+  - name: shipper_name
+    type: categorical
+    expr: company_name
+  measures:
+  - name: total_revenue
+    agg: sum
+    expr: net_amount
+    description: Total revenue from order lines after discounts
+  - name: total_gross_revenue
+    agg: sum
+    expr: gross_amount
+    description: Total revenue before discounts
+  - name: total_discount_amount
+    agg: sum
+    expr: discount_amount
+    description: Total discount amount given
+  - name: total_quantity_sold
+    agg: sum
+    expr: quantity
+    description: Total quantity of products sold
+  - name: total_freight
+    agg: sum
+    expr: freight_allocated
+    description: Total allocated freight costs
+  - name: avg_unit_price
+    agg: avg
+    expr: unit_price
+    description: Average unit price
+  - name: avg_discount_rate
+    agg: avg
+    expr: discount
+    description: Average discount rate
+  - name: order_line_count
+    agg: count
+    expr: order_line_key
+    description: Count of order lines
+  - name: unique_orders
+    agg: count_distinct
+    expr: order_id
+    description: Count of unique orders
+  - name: unique_products
+    agg: count_distinct
+    expr: product_key
+    description: Count of unique products sold
+  - name: unique_customers
+    agg: count_distinct
+    expr: customer_key
+    description: Count of unique customers
+- name: fct_orders
+  model: ref('fct_orders')
+  description: Order-level metrics with customer, employee, and shipping details
+  defaults:
+    agg_time_dimension: order_date
+  entities:
+  - name: order
+    type: primary
+    expr: order_key
+  - name: customer
+    type: foreign
+    expr: customer_key
+  - name: employee
+    type: foreign
+    expr: employee_key
+  - name: shipper
+    type: foreign
+    expr: shipper_key
+  dimensions:
+  - name: order_date
+    type: time
+    expr: order_date_key
+    type_params:
+      time_granularity: day
+  - name: required_date
+    type: time
+    expr: required_date_key
+    type_params:
+      time_granularity: day
+  - name: shipped_date
+    type: time
+    expr: shipped_date_key
+    type_params:
+      time_granularity: day
+  - name: customer_name
+    type: categorical
+    expr: company_name
+  - name: customer_country
+    type: categorical
+    expr: country
+  - name: employee_name
+    type: categorical
+    expr: employee_name
+  - name: employee_title
+    type: categorical
+    expr: title
+  - name: shipper_name
+    type: categorical
+    expr: company_name
+  measures:
+  - name: order_total_amount
+    agg: sum
+    expr: order_total
+    description: Total order amount
+  - name: total_freight_cost
+    agg: sum
+    expr: freight
+    description: Total freight costs
+  - name: avg_order_value
+    agg: avg
+    expr: order_total
+    description: Average order value
+  - name: avg_freight_cost
+    agg: avg
+    expr: freight
+    description: Average freight cost per order
+  - name: avg_line_items_per_order
+    agg: avg
+    expr: line_item_count
+    description: Average number of line items per order
+  - name: avg_days_to_ship
+    agg: avg
+    expr: days_to_ship
+    description: Average days from order to shipment
+  - name: order_count
+    agg: count
+    expr: order_key
+    description: Count of orders
+  - name: unique_customers_orders
+    agg: count_distinct
+    expr: customer_key
+    description: Count of unique customers with orders
+  - name: unique_employees_orders
+    agg: count_distinct
+    expr: employee_key
+    description: Count of unique employees with orders
+metrics:
+- name: total_revenue
+  description: Total revenue from all order lines after discounts
+  type: simple
+  type_params:
+    measure: total_revenue
+- name: total_orders
+  description: Total number of orders placed
+  type: simple
+  type_params:
+    measure: order_count
+- name: average_order_value
+  description: Average value per order
+  type: simple
+  type_params:
+    measure: avg_order_value
+- name: total_products_sold
+  description: Total quantity of all products sold
+  type: simple
+  type_params:
+    measure: total_quantity_sold
+- name: revenue_per_customer
+  description: Average revenue per customer
+  type: ratio
+  type_params:
+    numerator:
+      name: total_revenue
+    denominator:
+      name: unique_customers
+- name: orders_per_employee
+  description: Average orders handled per employee
+  type: ratio
+  type_params:
+    numerator:
+      name: order_count
+    denominator:
+      name: unique_employees_orders
+- name: discount_rate
+  description: Percentage of revenue given as discounts
+  type: ratio
+  type_params:
+    numerator:
+      name: total_discount_amount
+    denominator:
+      name: total_gross_revenue
+- name: freight_as_percent_of_revenue
+  description: Freight costs as percentage of total revenue
+  type: ratio
+  type_params:
+    numerator:
+      name: total_freight_cost
+    denominator:
+      name: total_revenue
+- name: revenue_growth_mom
+  description: Month-over-month revenue growth
+  type: derived
+  type_params:
+    expr: total_revenue - total_revenue_previous_month
+    metrics:
+    - name: total_revenue
+      offset_window: 1 month
+- name: order_fulfillment_time
+  description: Average time to fulfill orders
+  type: simple
+  type_params:
+    measure: avg_days_to_ship

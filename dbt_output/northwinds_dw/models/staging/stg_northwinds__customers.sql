@@ -1,21 +1,15 @@
-with source as (
-    select * from {{ source('northwinds', 'customers') }}
-),
+{{ config(materialized='view') }}
 
-renamed as (
-    select
-        customer_id as customer_key,
-        company_name,
-        contact_name,
-        contact_title,
-        address,
-        city,
-        region,
-        postal_code,
-        country,
-        phone,
-        fax
-    from source
-)
-
-select * from renamed
+select
+    customer_id,
+    company_name,
+    contact_name,
+    contact_title,
+    address,
+    city,
+    region,
+    postal_code,
+    country,
+    phone,
+    fax
+from {{ source('northwinds', 'customers') }}

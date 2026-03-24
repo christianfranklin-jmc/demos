@@ -32,10 +32,17 @@ streamlit_app/.streamlit/secrets.toml
 .bedrock_agentcore.yaml
 
 # phData Toolkit
+toolkit.conf
 lib/
 logs/
 /tools/
 .toolkit-metadata
+
+# dbt user config
+dbt_output/*/.user.yml
+
+# Claude Code
+.claude/
 
 # OS
 .DS_Store

@@ -1,15 +1,18 @@
 version: 2
 
 sources:
-  - name: northwinds
-    database: northwinds
+  - name: postgres
+    database: postgres
     schema: public
     tables:
       - name: categories
       - name: customers
+      - name: employee_territories
       - name: employees
       - name: order_details
       - name: orders
       - name: products
+      - name: region
       - name: shippers
       - name: suppliers
+      - name: territories

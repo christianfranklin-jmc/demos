@@ -1,12 +1,6 @@
 version: 2
 
 models:
-- name: dim_date
-  columns:
-    - name: dim_date_key
-      tests:
-        - unique
-        - not_null
 - name: dim_customers
   columns:
     - name: dim_customers_key
@@ -31,9 +25,21 @@ models:
       tests:
         - unique
         - not_null
+- name: dim_date
+  columns:
+    - name: dim_date_key
+      tests:
+        - unique
+        - not_null
 - name: fct_order_lines
   columns:
     - name: fct_order_lines_key
+      tests:
+        - unique
+        - not_null
+- name: fct_orders
+  columns:
+    - name: fct_orders_key
       tests:
         - unique
         - not_null

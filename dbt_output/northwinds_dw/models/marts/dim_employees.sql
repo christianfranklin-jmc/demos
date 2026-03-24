@@ -1,31 +1,36 @@
 {{ config(materialized='table') }}
 
+{{ config(materialized='table') }}
+
 with employees as (
     select * from {{ ref('stg_northwinds__employees') }}
 ),
 
-final as (
+managers as (
     select
-        {{ dbt_utils.generate_surrogate_key(['employee_key']) }} as employee_sk,
-        employee_key,
-        first_name,
-        last_name,
-        first_name || ' ' || last_name as full_name,
-        title,
-        title_of_courtesy,
-        birth_date,
-        hire_date,
-        address,
-        city,
-        region,
-        postal_code,
-        country,
-        home_phone,
-        extension,
-        notes,
-        reports_to,
-        photo_path
+        employee_id,
+        employee_name as manager_name
     from employees
 )
 
-select * from final
+select
+    {{ dbt_utils.generate_surrogate_key(['e.employee_id']) }} as employee_key,
+    e.employee_id,
+    e.employee_name,
+    e.first_name,
+    e.last_name,
+    e.title,
+    e.title_of_courtesy,
+    e.birth_date,
+    e.hire_date,
+    e.address,
+    e.city,
+    coalesce(e.region, 'Unknown') as region,
+    e.postal_code,
+    e.country,
+    e.home_phone,
+    e.extension,
+    e.reports_to,
+    coalesce(m.manager_name, 'None') as manager_name
+from employees e
+left join managers m on e.reports_to = m.employee_id
