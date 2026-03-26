@@ -13,3 +13,12 @@ backend_network_mode    = "PUBLIC"   # "PUBLIC" or "VPC"
 # backend_vpc_id                = "vpc-xxxxxxxx"
 # backend_vpc_subnet_ids        = ["subnet-aaa", "subnet-bbb"]
 # backend_vpc_security_group_ids = ["sg-xxxxxxxx"]
+
+# Database connection (for Gateway Lambda data tools)
+# These are set as Lambda env vars so tools can connect
+# db_host        = "my-cluster.xxxxx.us-east-1.rds.amazonaws.com"
+# db_port        = 5432
+# db_name        = "northwinds"
+# db_user        = "postgres"
+# db_password    = "secret"
+# db_driver_type = "postgresql"   # or "redshift"

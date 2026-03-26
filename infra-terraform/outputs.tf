@@ -40,9 +40,19 @@ output "runtime_id" {
   value       = module.backend.runtime_id
 }
 
+output "gateway_id" {
+  description = "AgentCore Gateway ID"
+  value       = module.backend.gateway_id
+}
+
 output "gateway_url" {
   description = "AgentCore Gateway URL"
   value       = module.backend.gateway_url
+}
+
+output "machine_client_id" {
+  description = "Machine client ID for M2M auth"
+  value       = module.backend.machine_client_id
 }
 
 output "memory_arn" {

@@ -42,9 +42,17 @@ module "backend" {
   oidc_discovery_url = module.cognito.oidc_discovery_url
 
   # VPC settings (conditional)
-  vpc_id             = var.backend_vpc_id
-  vpc_subnet_ids     = var.backend_vpc_subnet_ids
+  vpc_id                 = var.backend_vpc_id
+  vpc_subnet_ids         = var.backend_vpc_subnet_ids
   vpc_security_group_ids = var.backend_vpc_security_group_ids
+
+  # Database connection (for Gateway Lambda env vars)
+  db_host        = var.db_host
+  db_port        = var.db_port
+  db_name        = var.db_name
+  db_user        = var.db_user
+  db_password    = var.db_password
+  db_driver_type = var.db_driver_type
 
   tags = local.common_tags
 

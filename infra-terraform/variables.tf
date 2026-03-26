@@ -75,3 +75,44 @@ variable "backend_vpc_security_group_ids" {
   type        = list(string)
   default     = []
 }
+
+# -----------------------------------------------------------------------------
+# Database Connection (for Gateway Lambda)
+# -----------------------------------------------------------------------------
+
+variable "db_host" {
+  description = "Database host for Gateway Lambda data tools"
+  type        = string
+  default     = ""
+}
+
+variable "db_port" {
+  description = "Database port"
+  type        = number
+  default     = 5432
+}
+
+variable "db_name" {
+  description = "Database name"
+  type        = string
+  default     = ""
+}
+
+variable "db_user" {
+  description = "Database username"
+  type        = string
+  default     = ""
+}
+
+variable "db_password" {
+  description = "Database password"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "db_driver_type" {
+  description = "Database driver type: postgresql or redshift"
+  type        = string
+  default     = "postgresql"
+}
