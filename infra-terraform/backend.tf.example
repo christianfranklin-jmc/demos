@@ -1,0 +1,12 @@
+# Uncomment and configure for remote state storage.
+# Create the S3 bucket and DynamoDB table first.
+#
+# terraform {
+#   backend "s3" {
+#     bucket         = "platform-agent-tf-state"
+#     key            = "infra/terraform.tfstate"
+#     region         = "us-east-1"
+#     dynamodb_table = "platform-agent-tf-lock"
+#     encrypt        = true
+#   }
+# }

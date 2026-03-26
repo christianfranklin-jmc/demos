@@ -1,0 +1,48 @@
+# Local development compose — agent + frontend
+# Usage: docker-compose up [--build]
+#
+# Prerequisites:
+#   - FAST stack deployed (terraform apply) — needed for MEMORY_ID, GATEWAY_URL
+#   - AWS credentials as env vars (containers can't access ~/.aws/credentials)
+
+services:
+  agent:
+    build:
+      context: ..
+      dockerfile: patterns/platform-agent/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - AWS_ACCESS_KEY_ID
+      - AWS_SECRET_ACCESS_KEY
+      - AWS_SESSION_TOKEN
+      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-us-east-1}
+      - MEMORY_ID=${MEMORY_ID:-}
+      - STACK_NAME=${STACK_NAME:-platform-agent-stack}
+      - GATEWAY_URL=${GATEWAY_URL:-}
+      - OAUTH2_PROVIDER_NAME=${OAUTH2_PROVIDER_NAME:-}
+      - DB_HOST=${DB_HOST:-}
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_NAME=${DB_NAME:-}
+      - DB_USER=${DB_USER:-}
+      - DB_PASSWORD=${DB_PASSWORD:-}
+      - DB_DRIVER_TYPE=${DB_DRIVER_TYPE:-postgresql}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_AGENT_URL=http://agent:8080
+      - VITE_COGNITO_POOL_ID=${COGNITO_POOL_ID:-}
+      - VITE_COGNITO_CLIENT_ID=${COGNITO_CLIENT_ID:-}
+    depends_on:
+      agent:
+        condition: service_healthy

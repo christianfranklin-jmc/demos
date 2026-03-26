@@ -17,6 +17,23 @@ dependencies = [
 agentcore = [
     "bedrock-agentcore[ag-ui]>=0.1",
 ]
+redshift = [
+    "redshift_connector>=2.1",
+]
+snowflake = [
+    "snowflake-connector-python>=3.0",
+]
+databricks = [
+    "databricks-sql-connector>=3.0",
+]
+otel = [
+    "strands-agents[otel]>=1.30",
+    "aws-opentelemetry-distro>=0.5",
+    "opentelemetry-exporter-otlp>=1.20",
+]
+eval = [
+    "bedrock-agentcore-starter-toolkit>=0.1",
+]
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.24",
