@@ -63,8 +63,13 @@ variable "db_driver_type" {
 # --- Outputs ---
 
 output "runtime_id" {
-  description = "AgentCore Runtime ID (populated in Phase 3)"
-  value       = ""
+  description = "AgentCore Runtime ID"
+  value       = aws_bedrockagentcore_runtime.main.runtime_id
+}
+
+output "runtime_arn" {
+  description = "AgentCore Runtime ARN"
+  value       = aws_bedrockagentcore_runtime.main.arn
 }
 
 output "gateway_id" {
@@ -78,8 +83,18 @@ output "gateway_url" {
 }
 
 output "memory_arn" {
-  description = "AgentCore Memory ARN (populated in Phase 3)"
-  value       = ""
+  description = "AgentCore Memory ARN"
+  value       = aws_bedrockagentcore_memory.main.arn
+}
+
+output "memory_id" {
+  description = "AgentCore Memory ID"
+  value       = aws_bedrockagentcore_memory.main.memory_id
+}
+
+output "ecr_repository_url" {
+  description = "ECR repository URL for agent Docker image"
+  value       = var.deployment_type == "docker" ? aws_ecr_repository.agent[0].repository_url : ""
 }
 
 output "machine_client_id" {

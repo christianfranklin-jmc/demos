@@ -59,3 +59,18 @@ output "memory_arn" {
   description = "AgentCore Memory ARN"
   value       = module.backend.memory_arn
 }
+
+output "memory_id" {
+  description = "AgentCore Memory ID"
+  value       = module.backend.memory_id
+}
+
+output "runtime_arn" {
+  description = "AgentCore Runtime ARN"
+  value       = module.backend.runtime_arn
+}
+
+output "ecr_repository_url" {
+  description = "ECR repository URL for agent Docker image"
+  value       = module.backend.ecr_repository_url
+}
