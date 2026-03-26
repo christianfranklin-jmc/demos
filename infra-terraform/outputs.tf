@@ -26,6 +26,11 @@ output "cognito_domain_url" {
   value       = module.cognito.domain_url
 }
 
+output "cognito_oidc_issuer_url" {
+  description = "OIDC issuer URL for JWT validation"
+  value       = module.cognito.oidc_issuer_url
+}
+
 # -----------------------------------------------------------------------------
 # Backend
 # -----------------------------------------------------------------------------
