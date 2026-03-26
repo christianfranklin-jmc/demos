@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
-# teardown.sh — Remove AWS resources created by bootstrap.sh and agentcore launch.
+# teardown.sh — Remove AWS resources created by bootstrap.sh, Terraform, and agentcore.
+#
+# Destruction order:
+#   1. Terraform (AgentCore Runtime, Gateway, Memory, Cognito, Amplify)
+#   2. AgentCore CLI (legacy resources if any)
+#   3. RDS instance, subnet group, security group
 #
 # Usage:
 #   ./scripts/teardown.sh --profile <AWS_PROFILE> [--region <REGION>]
@@ -31,9 +36,27 @@ export AWS_PROFILE AWS_DEFAULT_REGION="$REGION"
 echo "=== Teardown AWS Platform Agent ==="
 
 # ---------------------------------------------------------------------------
-# Destroy AgentCore resources (agent runtime, ECR repo, gateway)
+# Destroy Terraform infrastructure (AgentCore Gateway, Runtime, Memory, Cognito, Amplify)
 # ---------------------------------------------------------------------------
-echo "--- AgentCore ---"
+echo "--- Terraform (infra-terraform/) ---"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TF_DIR="$SCRIPT_DIR/../infra-terraform"
+if [[ -d "$TF_DIR/.terraform" ]]; then
+    echo "Destroying Terraform-managed resources..."
+    (cd "$TF_DIR" && terraform destroy -auto-approve 2>&1) || \
+        echo "Terraform destroy completed (or had errors — check output above)."
+elif [[ -d "$TF_DIR" ]]; then
+    echo "Terraform not initialized. Run 'cd infra-terraform && terraform init' first."
+    echo "Skipping Terraform teardown."
+else
+    echo "infra-terraform/ not found. Skipping Terraform teardown."
+fi
+
+# ---------------------------------------------------------------------------
+# Destroy AgentCore resources (legacy — agent runtime, ECR repo, gateway)
+# ---------------------------------------------------------------------------
+echo ""
+echo "--- AgentCore CLI (legacy) ---"
 if command -v agentcore &> /dev/null; then
     echo "Destroying AgentCore resources..."
     agentcore destroy --force --delete-ecr-repo 2>&1 || echo "AgentCore destroy completed (or no resources found)."

@@ -44,6 +44,7 @@ infra-terraform/terraform.tfvars
 # Frontend
 frontend/node_modules/
 frontend/dist/
+.vite/
 
 # phData Toolkit
 toolkit.conf

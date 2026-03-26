@@ -191,8 +191,7 @@ Phases completed:
 - **Phase 5**: Semantic layer tool + Streamlit TTYD app. Agent learns schema dynamically.
 - **Phase 6**: AgentCore deployment — `serve.py` AG-UI protocol adapter
 
-In progress (FAST integration — branch `redshift-agentcore-dbt`):
-- **Phase 7**: FAST template integration — Terraform infrastructure, multi-database driver abstraction (PostgreSQL + Redshift), AgentCore Gateway (Lambda tools), Memory, Observability (OTel), Evaluation, React frontend, Cognito auth. ADRs 008-011.
+- **Phase 7**: FAST template integration — Terraform infrastructure (3-module hierarchy), multi-database driver abstraction (PostgreSQL + Redshift), AgentCore Gateway (5 Lambda tools), AgentCore Memory (30-day retention), Observability (OTel auto-instrumentation → CloudWatch), Evaluation (on-demand + 10% online sampling), React frontend (Vite + TypeScript + agentcore-client SSE), Cognito auth (JWT + OAuth2 M2M), Docker Compose local dev. ADRs 008-011. Branch: `redshift-agentcore-dbt`.
 
 ## dbt Project (Northwinds)
 
