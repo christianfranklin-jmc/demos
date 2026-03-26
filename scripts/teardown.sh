@@ -32,6 +32,7 @@ if [[ -z "$AWS_PROFILE" ]]; then
 fi
 
 export AWS_PROFILE AWS_DEFAULT_REGION="$REGION"
+AWS="aws"
 
 echo "=== Teardown AWS Platform Agent ==="
 
@@ -64,6 +65,48 @@ else
     echo "agentcore CLI not found. Skipping AgentCore teardown."
     echo "  Install: uv pip install 'bedrock-agentcore[ag-ui]'"
     echo "  Then run: agentcore destroy --force --delete-ecr-repo"
+fi
+
+# ---------------------------------------------------------------------------
+# Delete Redshift Serverless (workgroup then namespace)
+# ---------------------------------------------------------------------------
+echo ""
+echo "--- Redshift Serverless ---"
+RS_WORKGROUP="platform-agent-wg"
+RS_NAMESPACE="platform-agent-ns"
+
+RS_WG_STATUS=$($AWS redshift-serverless describe-workgroup \
+    --workgroup-name "$RS_WORKGROUP" \
+    --query 'workgroup.status' --output text 2>/dev/null || echo "not-found")
+
+if [[ "$RS_WG_STATUS" != "not-found" ]]; then
+    echo "Deleting Redshift workgroup: $RS_WORKGROUP..."
+    $AWS redshift-serverless delete-workgroup \
+        --workgroup-name "$RS_WORKGROUP" > /dev/null 2>&1 || true
+    echo "Waiting for workgroup deletion..."
+    for i in {1..60}; do
+        WG_CHECK=$($AWS redshift-serverless describe-workgroup \
+            --workgroup-name "$RS_WORKGROUP" \
+            --query 'workgroup.status' --output text 2>/dev/null || echo "deleted")
+        [[ "$WG_CHECK" == "deleted" ]] && break
+        sleep 5
+    done
+    echo "Workgroup deleted."
+else
+    echo "Redshift workgroup not found. Skipping."
+fi
+
+RS_NS_STATUS=$($AWS redshift-serverless describe-namespace \
+    --namespace-name "$RS_NAMESPACE" \
+    --query 'namespace.status' --output text 2>/dev/null || echo "not-found")
+
+if [[ "$RS_NS_STATUS" != "not-found" ]]; then
+    echo "Deleting Redshift namespace: $RS_NAMESPACE..."
+    $AWS redshift-serverless delete-namespace \
+        --namespace-name "$RS_NAMESPACE" > /dev/null 2>&1 || true
+    echo "Namespace deleted."
+else
+    echo "Redshift namespace not found. Skipping."
 fi
 
 # ---------------------------------------------------------------------------

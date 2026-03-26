@@ -81,21 +81,48 @@ def generate_dbt_project(
     _write_file(base_dir, "dbt_project.yml", dbt_project, created_files)
 
     # 2. profiles.yml (local development profile)
-    profiles = textwrap.dedent(f"""\
-        {project_name}:
-          target: dev
-          outputs:
-            dev:
-              type: postgres
-              host: "{{{{ env_var('DBT_HOST') }}}}"
-              port: "{{{{ env_var('DBT_PORT', '5432') | int }}}}"
-              user: "{{{{ env_var('DBT_USER') }}}}"
-              pass: "{{{{ env_var('DBT_PASSWORD') }}}}"
-              dbname: "{{{{ env_var('DBT_DBNAME') }}}}"
-              schema: {source_schema}
-              threads: 4
-              sslmode: require
-    """)
+    # Use driver config if a driver is connected, otherwise default to postgres
+    dbt_type = "postgres"
+    dbt_port_default = "5432"
+    extra_config = "sslmode: require"
+    try:
+        from ..drivers import get_driver
+        driver = get_driver(f"postgresql_{source_database}")
+        dbt_type = driver.get_dbt_adapter()
+        if dbt_type == "redshift":
+            dbt_port_default = "5439"
+            extra_config = ""  # Redshift connector handles SSL natively
+    except (ValueError, ImportError):
+        # No driver connected or drivers not available — check other source IDs
+        try:
+            from ..drivers import get_driver, list_sources
+            for sid in list_sources():
+                driver = get_driver(sid)
+                dbt_type = driver.get_dbt_adapter()
+                if dbt_type == "redshift":
+                    dbt_port_default = "5439"
+                    extra_config = ""
+                break
+        except (ValueError, ImportError):
+            pass
+
+    profiles_lines = [
+        f"{project_name}:",
+        "  target: dev",
+        "  outputs:",
+        "    dev:",
+        f"      type: {dbt_type}",
+        "      host: \"{{ env_var('DBT_HOST') }}\"",
+        f"      port: \"{{{{ env_var('DBT_PORT', '{dbt_port_default}') | int }}}}\"",
+        "      user: \"{{ env_var('DBT_USER') }}\"",
+        "      pass: \"{{ env_var('DBT_PASSWORD') }}\"",
+        "      dbname: \"{{ env_var('DBT_DBNAME') }}\"",
+        f"      schema: {source_schema}",
+        "      threads: 4",
+    ]
+    if extra_config:
+        profiles_lines.append(f"      {extra_config}")
+    profiles = "\n".join(profiles_lines) + "\n"
     _write_file(base_dir, "profiles.yml", profiles, created_files)
 
     # 2b. packages.yml (dbt_utils for surrogate keys, etc.)

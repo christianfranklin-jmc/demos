@@ -1,8 +1,8 @@
-"""Tool: Connect to an AWS data service."""
+"""Tool: Connect to an AWS data service (PostgreSQL, Redshift, etc.)."""
 
 from strands import tool
 
-from . import _toolkit_client
+from ..drivers import DRIVER_REGISTRY, create_driver
 
 
 @tool
@@ -12,36 +12,38 @@ def connect_to_database(
     database: str,
     user: str,
     password: str,
+    driver_type: str = "postgresql",
     source_id: str = "",
 ) -> dict:
-    """Connect to a PostgreSQL database on AWS.
+    """Connect to a database on AWS (PostgreSQL, Redshift, or other supported types).
 
     Establishes a connection and registers it for subsequent scan, query, and DDL operations.
     Returns a source_id that must be used in all follow-up tool calls.
 
-    The source_id should match the datasource name in toolkit.conf if using phData Toolkit
-    (e.g., "northwinds"). If not provided, one is generated automatically.
-
     Args:
         host: The database hostname (e.g., my-instance.abc123.us-east-1.rds.amazonaws.com).
-        port: The database port (typically 5432 for PostgreSQL).
+        port: The database port (5432 for PostgreSQL, 5439 for Redshift).
         database: The database name to connect to.
         user: The database username.
         password: The database password.
-        source_id: Optional identifier for this connection. Should match toolkit.conf datasource name.
+        driver_type: Database type — "postgresql" or "redshift". Defaults to "postgresql".
+        source_id: Optional identifier for this connection. Auto-generated if not provided.
     """
-    session = _toolkit_client.connect(
+    source_id = source_id or f"{driver_type}_{database}"
+
+    driver = create_driver(
+        driver_type=driver_type,
+        source_id=source_id,
         host=host,
         port=port,
         database=database,
         user=user,
         password=password,
-        source_id=source_id or None,
     )
     return {
         "status": "connected",
-        "source_id": session.source_id,
-        "service": session.service,
-        "database": session.database,
-        "toolkit_available": _toolkit_client._toolkit_available(),
+        "source_id": source_id,
+        "driver_type": driver.driver_type,
+        "database": database,
+        "available_drivers": list(DRIVER_REGISTRY.keys()),
     }

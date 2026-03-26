@@ -2,35 +2,32 @@
 
 from strands import tool
 
-from . import _toolkit_client
+from ..drivers import get_driver
 
 
 @tool
 def scan_metadata(source_id: str) -> dict:
     """Scan the connected database and return a structured metadata profile.
 
-    Uses phData Toolkit CLI if available for richer metadata including ERD graph
-    and constraint details. Falls back to information_schema queries otherwise.
-
     Returns tables, columns, data types, primary keys, foreign keys, and row counts.
+    Works with any supported database type (PostgreSQL, Redshift, etc.).
 
     Args:
         source_id: The source identifier returned by connect_to_database.
     """
-    return _toolkit_client.scan(source_id)
+    driver = get_driver(source_id)
+    return driver.scan_metadata()
 
 
 @tool
 def profile_database(source_id: str) -> dict:
     """Profile the connected database with column-level statistics.
 
-    Runs phData Toolkit's profiler to compute per-column metrics: distinct_count,
-    min, max, null_count, negative_count, zero_count. This is more detailed than
-    scan_metadata and useful for data quality assessment and discovery.
-
-    Requires phData Toolkit CLI to be available.
+    Returns per-column metrics like distinct counts, null rates, min/max values.
+    Depth of profiling varies by database type.
 
     Args:
         source_id: The source identifier returned by connect_to_database.
     """
-    return _toolkit_client.profile(source_id)
+    driver = get_driver(source_id)
+    return driver.profile_columns()

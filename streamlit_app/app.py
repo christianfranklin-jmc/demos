@@ -17,8 +17,7 @@ import streamlit as st
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from platform_agent.agent import create_agent
-from platform_agent.tools._toolkit_client import connect
-
+from platform_agent.drivers import create_driver
 
 # ---------------------------------------------------------------------------
 # Helper functions (must be defined before use in Streamlit's top-to-bottom execution)
@@ -97,6 +96,8 @@ with st.sidebar:
     user = st.text_input("User", value=os.environ.get("DB_USER", ""))
     password = st.text_input("Password", type="password",
                              value=os.environ.get("DB_PASSWORD", ""))
+    driver_type = st.selectbox("Database Type", ["postgresql", "redshift"],
+        index=0)
     aws_profile = st.text_input("AWS Profile", value=os.environ.get(
         "AWS_PROFILE", "AdministratorAccess-637119802057"))
 
@@ -131,10 +132,12 @@ if connect_btn:
     else:
         with st.spinner("Connecting and discovering schema..."):
             try:
-                source_id = f"rds_postgresql_{database}"
-                connect(
+                source_id = f"{driver_type}_{database}"
+                create_driver(
+                    driver_type=driver_type,
+                    source_id=source_id,
                     host=host, port=int(port), database=database,
-                    user=user, password=password, source_id=source_id,
+                    user=user, password=password,
                 )
                 agent = create_agent(profile_name=aws_profile)
 
@@ -196,38 +199,37 @@ if prompt := st.chat_input("Ask a question about your data..."):
 
         # Get agent response — the agent already has schema context from the
         # scan_metadata call during connection. It uses run_query to answer.
-        with st.chat_message("assistant"):
-            with st.spinner("Thinking..."):
-                try:
-                    agent = st.session_state.agent
-                    source_id = st.session_state.source_id
-                    full_prompt = (
-                        f"The database is connected with source_id='{source_id}'. "
-                        f"Use run_query to answer this question with actual data. "
-                        f"If the question is ambiguous, use scan_metadata or run_query "
-                        f"to explore the schema first. Question: {prompt}"
-                    )
-                    result = agent(full_prompt)
-                    response_text = _extract_text(result)
+        with st.chat_message("assistant"), st.spinner("Thinking..."):
+            try:
+                agent = st.session_state.agent
+                source_id = st.session_state.source_id
+                full_prompt = (
+                    f"The database is connected with source_id='{source_id}'. "
+                    f"Use run_query to answer this question with actual data. "
+                    f"If the question is ambiguous, use scan_metadata or run_query "
+                    f"to explore the schema first. Question: {prompt}"
+                )
+                result = agent(full_prompt)
+                response_text = _extract_text(result)
 
-                    st.markdown(response_text)
+                st.markdown(response_text)
 
-                    # Try to extract query results for display
-                    df = _extract_query_results(result)
-                    msg_data = {"role": "assistant", "content": response_text}
-                    if df is not None and not df.empty:
-                        st.dataframe(df, use_container_width=True)
-                        msg_data["dataframe"] = df
-                        # Auto-chart if small enough
-                        chart = _auto_chart(df)
-                        if chart:
-                            msg_data["chart_data"] = chart
+                # Try to extract query results for display
+                df = _extract_query_results(result)
+                msg_data = {"role": "assistant", "content": response_text}
+                if df is not None and not df.empty:
+                    st.dataframe(df, use_container_width=True)
+                    msg_data["dataframe"] = df
+                    # Auto-chart if small enough
+                    chart = _auto_chart(df)
+                    if chart:
+                        msg_data["chart_data"] = chart
 
-                    st.session_state.messages.append(msg_data)
+                st.session_state.messages.append(msg_data)
 
-                except Exception as e:
-                    error_msg = f"Error: {e}"
-                    st.error(error_msg)
-                    st.session_state.messages.append(
-                        {"role": "assistant", "content": error_msg}
-                    )
+            except Exception as e:
+                error_msg = f"Error: {e}"
+                st.error(error_msg)
+                st.session_state.messages.append(
+                    {"role": "assistant", "content": error_msg}
+                )

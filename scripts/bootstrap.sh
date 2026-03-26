@@ -283,10 +283,121 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# Step 7: Generate config files
+# Step 7: Redshift Serverless
 # ---------------------------------------------------------------------------
 echo ""
-echo "--- Step 7: Generating config files ---"
+echo "--- Step 7: Redshift Serverless ---"
+
+RS_NAMESPACE="platform-agent-ns"
+RS_WORKGROUP="platform-agent-wg"
+RS_DB_NAME="dev"
+RS_ADMIN_USER="admin"
+RS_ADMIN_PASSWORD="$DB_PASSWORD"
+
+# Check if namespace exists
+RS_NS_STATUS=$($AWS redshift-serverless describe-namespace \
+    --namespace-name "$RS_NAMESPACE" \
+    --query 'namespace.status' --output text 2>/dev/null || echo "not-found")
+
+if [[ "$RS_NS_STATUS" == "not-found" ]]; then
+    echo "Creating Redshift Serverless namespace: $RS_NAMESPACE..."
+    $AWS redshift-serverless create-namespace \
+        --namespace-name "$RS_NAMESPACE" \
+        --db-name "$RS_DB_NAME" \
+        --admin-username "$RS_ADMIN_USER" \
+        --admin-user-password "$RS_ADMIN_PASSWORD" \
+        > /dev/null
+    echo "Namespace created."
+else
+    echo "Reusing namespace: $RS_NAMESPACE (status: $RS_NS_STATUS)"
+fi
+
+# Check if workgroup exists
+RS_WG_STATUS=$($AWS redshift-serverless describe-workgroup \
+    --workgroup-name "$RS_WORKGROUP" \
+    --query 'workgroup.status' --output text 2>/dev/null || echo "not-found")
+
+if [[ "$RS_WG_STATUS" == "not-found" ]]; then
+    echo "Creating Redshift Serverless workgroup: $RS_WORKGROUP..."
+    # Use the same security group and subnets as RDS for network access
+    $AWS redshift-serverless create-workgroup \
+        --workgroup-name "$RS_WORKGROUP" \
+        --namespace-name "$RS_NAMESPACE" \
+        --base-capacity 8 \
+        --publicly-accessible \
+        --security-group-ids "$SG_ID" \
+        --subnet-ids "${SUBNET_ARRAY[@]}" \
+        > /dev/null
+    echo "Workgroup creation initiated (takes 2-5 minutes)..."
+else
+    echo "Reusing workgroup: $RS_WORKGROUP (status: $RS_WG_STATUS)"
+fi
+
+# Wait for workgroup to become available
+echo "Waiting for Redshift Serverless workgroup..."
+for i in {1..60}; do
+    RS_WG_STATUS=$($AWS redshift-serverless describe-workgroup \
+        --workgroup-name "$RS_WORKGROUP" \
+        --query 'workgroup.status' --output text 2>/dev/null || echo "not-found")
+    if [[ "$RS_WG_STATUS" == "AVAILABLE" ]]; then
+        break
+    fi
+    sleep 5
+done
+
+if [[ "$RS_WG_STATUS" != "AVAILABLE" ]]; then
+    echo "WARNING: Redshift workgroup not yet available (status: $RS_WG_STATUS)."
+    echo "It may still be creating. Check the AWS console."
+    RS_ENDPOINT="PENDING"
+    RS_PORT=5439
+else
+    RS_ENDPOINT=$($AWS redshift-serverless describe-workgroup \
+        --workgroup-name "$RS_WORKGROUP" \
+        --query 'workgroup.endpoint.address' --output text)
+    RS_PORT=$($AWS redshift-serverless describe-workgroup \
+        --workgroup-name "$RS_WORKGROUP" \
+        --query 'workgroup.endpoint.port' --output text)
+    echo "Redshift Serverless available at: ${RS_ENDPOINT}:${RS_PORT}"
+fi
+
+# Seed Northwinds into Redshift (if available and not already seeded)
+if [[ "$RS_ENDPOINT" != "PENDING" ]]; then
+    echo "Seeding Northwinds data into Redshift..."
+    if command -v uv &> /dev/null && uv run python -c "import redshift_connector" 2>/dev/null; then
+        uv run python -c "
+import redshift_connector
+conn = redshift_connector.connect(
+    host='${RS_ENDPOINT}', port=${RS_PORT},
+    database='${RS_DB_NAME}', user='${RS_ADMIN_USER}',
+    password='${RS_ADMIN_PASSWORD}', ssl=True
+)
+conn.autocommit = True
+cur = conn.cursor()
+cur.execute(\"SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE'\")
+count = cur.fetchone()[0]
+if count >= 10:
+    print(f'Redshift already has {count} tables — skipping seed.')
+else:
+    print('Loading seed data into Redshift...')
+    with open('scripts/seed_northwinds.sql', 'r') as f:
+        sql = f.read()
+    cur.execute(sql)
+    cur.execute(\"SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE'\")
+    print(f'Redshift seeded: {cur.fetchone()[0]} tables')
+cur.close(); conn.close()
+" 2>&1
+    else
+        echo "WARNING: redshift_connector not installed. Skipping Redshift seed."
+        echo "  Install with: uv pip install -e '.[redshift]'"
+        echo "  Then seed manually via the Streamlit app or CLI agent."
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# Step 8: Generate config files
+# ---------------------------------------------------------------------------
+echo ""
+echo "--- Step 8: Generating config files ---"
 
 # .env file
 cat > "$PROJECT_DIR/.env" <<ENVEOF
@@ -294,12 +405,20 @@ cat > "$PROJECT_DIR/.env" <<ENVEOF
 AWS_PROFILE=$AWS_PROFILE
 AWS_DEFAULT_REGION=$REGION
 
-# Database connection
+# PostgreSQL (RDS) connection
 DB_HOST=$DB_ENDPOINT
 DB_PORT=$DB_PORT
 DB_NAME=$DB_NAME
 DB_USER=$DB_USER
 DB_PASSWORD=$DB_PASSWORD
+DB_DRIVER_TYPE=postgresql
+
+# Redshift Serverless connection
+RS_HOST=$RS_ENDPOINT
+RS_PORT=${RS_PORT:-5439}
+RS_DB_NAME=$RS_DB_NAME
+RS_USER=$RS_ADMIN_USER
+RS_PASSWORD=$RS_ADMIN_PASSWORD
 ENVEOF
 echo "Created .env"
 
@@ -343,24 +462,25 @@ DBTEOF
 echo "Created dbt profiles.yml"
 
 # ---------------------------------------------------------------------------
-# Step 8: Install Python dependencies
+# Step 9: Install Python dependencies
 # ---------------------------------------------------------------------------
 echo ""
-echo "--- Step 8: Installing Python dependencies ---"
+echo "--- Step 9: Installing Python dependencies ---"
 cd "$PROJECT_DIR"
 if command -v uv &> /dev/null; then
     uv pip install -e ".[dev]" 2>&1 | tail -1
-    echo "Python dependencies installed via uv."
+    uv pip install -e ".[redshift]" 2>&1 | tail -1
+    echo "Python dependencies installed via uv (core + redshift)."
 else
     echo "WARNING: uv not found. Install with: curl -LsSf https://astral.sh/uv/install.sh | sh"
-    echo "Then run: uv pip install -e '.[dev]'"
+    echo "Then run: uv pip install -e '.[dev]' && uv pip install -e '.[redshift]'"
 fi
 
 # ---------------------------------------------------------------------------
-# Step 9: Verify dbt
+# Step 10: Verify dbt
 # ---------------------------------------------------------------------------
 echo ""
-echo "--- Step 9: Verifying dbt project ---"
+echo "--- Step 10: Verifying dbt project ---"
 cd "$PROJECT_DIR"
 if uv run dbt deps --project-dir dbt_output/northwinds_dw --profiles-dir dbt_output/northwinds_dw > /dev/null 2>&1; then
     uv run dbt compile --project-dir dbt_output/northwinds_dw --profiles-dir dbt_output/northwinds_dw > /dev/null 2>&1
@@ -375,11 +495,16 @@ fi
 echo ""
 echo "=== Bootstrap complete ==="
 echo ""
-echo "RDS endpoint: $DB_ENDPOINT"
-echo "Database:     $DB_NAME"
-echo "Config files: .env, toolkit.conf, dbt_output/northwinds_dw/profiles.yml"
+echo "PostgreSQL (RDS):  $DB_ENDPOINT:$DB_PORT"
+echo "Redshift:          ${RS_ENDPOINT:-PENDING}:${RS_PORT:-5439}"
+echo "Database:          $DB_NAME (PostgreSQL), $RS_DB_NAME (Redshift)"
+echo "Config files:      .env, toolkit.conf, dbt_output/northwinds_dw/profiles.yml"
 echo ""
 echo "Next steps:"
 echo "  source .env"
 echo "  uv run python -m platform_agent --profile $AWS_PROFILE"
 echo "  uv run streamlit run streamlit_app/app.py --server.port 8501"
+echo ""
+echo "To connect to Redshift in the agent:"
+echo "  connect_to_database(host=RS_HOST, port=5439, database='dev', user='admin',"
+echo "                      password=..., driver_type='redshift')"
