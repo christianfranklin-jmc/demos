@@ -1,0 +1,32 @@
+[
+  {
+    "name": "schema_discovery",
+    "prompt": "Connect to the database and scan the schema. How many tables are there?",
+    "expected_tools": ["connect_to_database", "scan_metadata"],
+    "expected_contains": ["14", "tables"]
+  },
+  {
+    "name": "query_execution",
+    "prompt": "How many orders are in the database?",
+    "expected_tools": ["run_query"],
+    "expected_contains": ["830"]
+  },
+  {
+    "name": "revenue_query",
+    "prompt": "What are the top 5 products by revenue?",
+    "expected_tools": ["run_query"],
+    "expected_contains": ["product"]
+  },
+  {
+    "name": "star_schema_proposal",
+    "prompt": "What business processes are in this database? Propose a Kimball star schema.",
+    "expected_tools": ["scan_metadata"],
+    "expected_contains": ["fact", "dimension"]
+  },
+  {
+    "name": "dbt_generation",
+    "prompt": "Generate a dbt project for the star schema you proposed.",
+    "expected_tools": ["generate_dbt_project"],
+    "expected_contains": ["dbt", "models"]
+  }
+]
