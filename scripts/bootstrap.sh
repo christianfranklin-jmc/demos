@@ -180,14 +180,23 @@ if [[ "$SG_ID" == "None" || -z "$SG_ID" ]]; then
         --query 'GroupId' --output text)
     echo "Created security group: $SG_ID"
 
-    # Allow PostgreSQL from anywhere (demo only — restrict in production)
+    # Allow PostgreSQL + Redshift from anywhere (demo only — restrict in production)
     $AWS ec2 authorize-security-group-ingress \
         --group-id "$SG_ID" \
         --protocol tcp --port 5432 --cidr 0.0.0.0/0 \
         > /dev/null
-    echo "Opened port 5432 (0.0.0.0/0 — demo only)"
+    $AWS ec2 authorize-security-group-ingress \
+        --group-id "$SG_ID" \
+        --protocol tcp --port 5439 --cidr 0.0.0.0/0 \
+        > /dev/null
+    echo "Opened ports 5432 (PostgreSQL) and 5439 (Redshift) — demo only"
 else
     echo "Reusing security group: $SG_ID"
+    # Ensure Redshift port is open (may not exist if SG was created before Redshift support)
+    $AWS ec2 authorize-security-group-ingress \
+        --group-id "$SG_ID" \
+        --protocol tcp --port 5439 --cidr 0.0.0.0/0 \
+        > /dev/null 2>&1 || true
 fi
 
 # ---------------------------------------------------------------------------
@@ -295,7 +304,7 @@ RS_ADMIN_USER="admin"
 RS_ADMIN_PASSWORD="$DB_PASSWORD"
 
 # Check if namespace exists
-RS_NS_STATUS=$($AWS redshift-serverless describe-namespace \
+RS_NS_STATUS=$($AWS redshift-serverless get-namespace \
     --namespace-name "$RS_NAMESPACE" \
     --query 'namespace.status' --output text 2>/dev/null || echo "not-found")
 
@@ -336,7 +345,7 @@ fi
 # Wait for workgroup to become available
 echo "Waiting for Redshift Serverless workgroup..."
 for i in {1..60}; do
-    RS_WG_STATUS=$($AWS redshift-serverless describe-workgroup \
+    RS_WG_STATUS=$($AWS redshift-serverless get-workgroup \
         --workgroup-name "$RS_WORKGROUP" \
         --query 'workgroup.status' --output text 2>/dev/null || echo "not-found")
     if [[ "$RS_WG_STATUS" == "AVAILABLE" ]]; then
@@ -351,10 +360,10 @@ if [[ "$RS_WG_STATUS" != "AVAILABLE" ]]; then
     RS_ENDPOINT="PENDING"
     RS_PORT=5439
 else
-    RS_ENDPOINT=$($AWS redshift-serverless describe-workgroup \
+    RS_ENDPOINT=$($AWS redshift-serverless get-workgroup \
         --workgroup-name "$RS_WORKGROUP" \
         --query 'workgroup.endpoint.address' --output text)
-    RS_PORT=$($AWS redshift-serverless describe-workgroup \
+    RS_PORT=$($AWS redshift-serverless get-workgroup \
         --workgroup-name "$RS_WORKGROUP" \
         --query 'workgroup.endpoint.port' --output text)
     echo "Redshift Serverless available at: ${RS_ENDPOINT}:${RS_PORT}"

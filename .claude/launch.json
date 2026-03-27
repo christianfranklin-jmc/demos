@@ -6,6 +6,12 @@
       "runtimeExecutable": ".venv/bin/streamlit",
       "runtimeArgs": ["run", "streamlit_app/app.py", "--server.port", "8501"],
       "port": 8501
+    },
+    {
+      "name": "frontend",
+      "runtimeExecutable": "/bin/sh",
+      "runtimeArgs": ["-c", "cd frontend && /opt/homebrew/bin/node node_modules/.bin/vite"],
+      "port": 3000
     }
   ]
 }

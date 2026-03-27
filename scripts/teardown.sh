@@ -75,7 +75,7 @@ echo "--- Redshift Serverless ---"
 RS_WORKGROUP="platform-agent-wg"
 RS_NAMESPACE="platform-agent-ns"
 
-RS_WG_STATUS=$($AWS redshift-serverless describe-workgroup \
+RS_WG_STATUS=$($AWS redshift-serverless get-workgroup \
     --workgroup-name "$RS_WORKGROUP" \
     --query 'workgroup.status' --output text 2>/dev/null || echo "not-found")
 
@@ -96,7 +96,7 @@ else
     echo "Redshift workgroup not found. Skipping."
 fi
 
-RS_NS_STATUS=$($AWS redshift-serverless describe-namespace \
+RS_NS_STATUS=$($AWS redshift-serverless get-namespace \
     --namespace-name "$RS_NAMESPACE" \
     --query 'namespace.status' --output text 2>/dev/null || echo "not-found")
 
