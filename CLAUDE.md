@@ -64,8 +64,8 @@ dbt_output/northwinds_dw/         # Generated dbt project (14 models, compiles c
 tests/                            # Unit and integration tests
 streamlit_app/app.py              # Streamlit TTYD app (preserved as alternative)
 scripts/
-  bootstrap.sh                    # Provision RDS + seed data + config files
-  teardown.sh                     # Remove AWS resources + terraform destroy
+  bootstrap.sh                    # Provision RDS + Redshift Serverless + seed data + config files
+  teardown.sh                     # Remove Redshift + RDS + AgentCore + terraform destroy
   seed_northwinds.sql             # Northwinds DDL + 3362 INSERT statements
 .env.example                      # Template for env vars (copy to .env)
 ```
@@ -152,14 +152,16 @@ The agent supports multiple database backends via the `DatabaseDriver` protocol 
 - **Profile**: `AdministratorAccess-637119802057`
 - **Region**: us-east-1
 - **RDS**: Provisioned by `scripts/bootstrap.sh` — PostgreSQL 16.6, db.t3.micro, Northwinds dataset
+- **Redshift**: Provisioned by `scripts/bootstrap.sh` — Serverless, 8 base RPU, Northwinds dataset
 - **Bedrock models**: us.anthropic.claude-sonnet-4, us.anthropic.claude-opus-4
 
 ### Bootstrap creates:
-- Security group (`platform-agent-rds-sg`, port 5432 open)
+- Security group (`platform-agent-rds-sg`, ports 5432 + 5439 open)
 - DB subnet group (`platform-agent-db-subnets`)
-- RDS instance (`platform-agent-northwinds`)
-- Seeds Northwinds (14 tables, 830 orders)
-- Generates `.env`, `toolkit.conf`, `dbt_output/northwinds_dw/profiles.yml`
+- RDS instance (`platform-agent-northwinds`) — PostgreSQL 16.6, db.t3.micro
+- Redshift Serverless namespace (`platform-agent-ns`) + workgroup (`platform-agent-wg`, 8 base RPU)
+- Seeds Northwinds into both PostgreSQL and Redshift (14 tables, 830 orders)
+- Generates `.env` with DB_* (PostgreSQL) and RS_* (Redshift) connection vars
 
 ### Terraform creates (infra-terraform/):
 - Cognito User Pool + OAuth2 clients (web + machine)
@@ -208,7 +210,7 @@ uv run dbt run --profiles-dir .      # Materialize to RDS
 uv run streamlit run streamlit_app/app.py --server.port 8501
 ```
 
-The app connects to any PostgreSQL database, runs `scan_metadata` to discover the schema, then accepts NL questions. The agent uses `run_query` to answer with actual data.
+The app connects to any PostgreSQL or Redshift database (selectable via Database Type dropdown), runs `scan_metadata` to discover the schema, then accepts NL questions. The agent uses `run_query` to answer with actual data.
 
 ## AgentCore Deployment
 

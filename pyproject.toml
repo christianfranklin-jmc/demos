@@ -19,6 +19,7 @@ agentcore = [
 ]
 redshift = [
     "redshift_connector>=2.1",
+    "dbt-redshift>=1.9",
 ]
 snowflake = [
     "snowflake-connector-python>=3.0",

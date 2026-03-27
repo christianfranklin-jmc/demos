@@ -337,6 +337,7 @@ otel = [
     { name = "strands-agents", extra = ["otel"] },
 ]
 redshift = [
+    { name = "dbt-redshift" },
     { name = "redshift-connector" },
 ]
 snowflake = [
@@ -351,6 +352,7 @@ requires-dist = [
     { name = "boto3", specifier = ">=1.35" },
     { name = "databricks-sql-connector", marker = "extra == 'databricks'", specifier = ">=3.0" },
     { name = "dbt-postgres", specifier = ">=1.9" },
+    { name = "dbt-redshift", marker = "extra == 'redshift'", specifier = ">=1.9" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.13" },
     { name = "opentelemetry-exporter-otlp", marker = "extra == 'otel'", specifier = ">=1.20" },
     { name = "psycopg2-binary", specifier = ">=2.9" },
@@ -899,6 +901,25 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/9f/44/a439f5631013de921f4f9716af639740e277286f7c693930450d930fdc00/dbt_protos-1.0.443.tar.gz", hash = "sha256:6cc4b2146ccdf77d597534a0525c97e37d68b0ca34334661f37650d81e09632b", size = 127531, upload-time = "2026-03-17T15:24:56.585Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d3/01/d9385e15664acd680eff3b19ce4d45f167bc7054de455bfac2e7c638c62f/dbt_protos-1.0.443-py3-none-any.whl", hash = "sha256:f8c4bef794ee3c442248b4c8f7cba3d0af46ad389d4960c0a73a3b307f9434fa", size = 186314, upload-time = "2026-03-17T15:24:54.792Z" },
+]
+
+[[package]]
+name = "dbt-redshift"
+version = "1.10.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "agate" },
+    { name = "dbt-adapters" },
+    { name = "dbt-common" },
+    { name = "dbt-core" },
+    { name = "dbt-postgres" },
+    { name = "redshift-connector" },
+    { name = "requests" },
+    { name = "sqlparse" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/59/2b/e7adc542f7272bbcd9cba03e5069013976158624bffbff815713b8c4d25c/dbt_redshift-1.10.1.tar.gz", hash = "sha256:3b7fca824be29bb3efe0f865c374d18d3f865ceb9d7aebd074dc4ea86d76db29", size = 76863, upload-time = "2026-02-11T03:39:36.34Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d4/77/40f0107f97352954282f7727ed1a5f6c5d9889035452e70fd21f14f0a768/dbt_redshift-1.10.1-py3-none-any.whl", hash = "sha256:12f73f6d4c6ce4668059ffb84138f9884e4213a93700a5ff161077977ea509ab", size = 53699, upload-time = "2026-02-11T03:39:35.247Z" },
 ]
 
 [[package]]

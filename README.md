@@ -70,7 +70,6 @@ The agent exposes 8 tools to the LLM:
 5. **`execute_ddl`** — Run DDL statements (DROP/TRUNCATE blocked by guardrails)
 6. **`generate_dbt_project`** — Full dbt project from a star schema design (adapter auto-selected)
 7. **`generate_semantic_layer`** — MetricFlow YAML for the dbt Semantic Layer
-8. **`generate_dbt_project`** — Produces staging, marts, sources, tests, profiles
 
 ## Multi-Database Support
 
