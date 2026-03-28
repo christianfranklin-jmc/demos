@@ -48,16 +48,23 @@ patterns/platform-agent/          # FAST agent pattern — generic data engineer
   Dockerfile                      # Container image with OTel instrumentation
   tools/                          # Direct tools (dbt_generate, semantic_layer)
   prompts/                        # System prompt (copied from src/)
-patterns/migration-agent/         # Snowflake → Iceberg migration agent
+patterns/migration-agent/         # Snowflake → Iceberg migration agent (5 tools)
   agent.py                        # BedrockAgentCoreApp with migration tools
-  tools/extract_schema.py         # Enriched Snowflake schema analysis
-  tools/convert_to_iceberg.py     # Iceberg DDL generation + type mapping
-  tools/validate_migration.py     # Row count validation + reporting
+  tools/extract_schema.py         # Enriched Snowflake schema + migration strategy
+  tools/convert_to_iceberg.py     # Iceberg DDL generation + SF type mapping
+  tools/scaffold_dbt_project.py   # dbt project from migrated tables (Snowflake profiles)
+  tools/validate_migration.py     # Row count validation + comparison reporting
   prompts/system.py               # Migration workflow (7 phases)
-patterns/enrichment-agent/        # RAG descriptions + DataZone + semantic YAML
-patterns/quality-agent/           # DQDL rules + quarantine + dbt test
-patterns/mapping-agent/           # Neptune graph + entity extraction + dbt lineage
-patterns/query-agent/             # NL-to-SQL + semantic cache + self-correction
+patterns/enrichment-agent/        # RAG descriptions + DataZone + semantic YAML (3 tools)
+  tools/generate_descriptions.py  # LLM-inferred table/column descriptions + RAG
+  tools/update_catalog.py         # Write descriptions to Snowflake/Glue + synonyms
+patterns/quality-agent/           # DQDL rules + quarantine + dbt test (4 tools)
+  tools/quality_rules.py          # DQDL rule generation + dbt test generation
+  tools/quarantine.py             # Quality checks, failure detection, remediation plans
+patterns/mapping-agent/           # Neptune graph + entity extraction (3 tools)
+  tools/knowledge_graph.py        # Entity/relationship extraction, RDF triples, Neptune load
+patterns/query-agent/             # NL-to-SQL + semantic cache (5 tools)
+  tools/query_pipeline.py         # Intent classification, EXPLAIN validation, cache, schema
 patterns/utils/                   # Shared utilities (from FAST template)
   auth.py                         # JWT extraction + OAuth2 token management
   ssm.py                          # SSM parameter retrieval
@@ -67,6 +74,10 @@ infra-terraform/                  # Terraform infrastructure (FAST template)
   modules/amplify-hosting/        # S3 + Amplify App
   modules/cognito/                # User Pool + OAuth2 clients
   modules/backend/                # Runtime, Gateway, Memory, OAuth2 provider
+  modules/data/                   # S3, Glue Catalog, Neptune, ElastiCache
+  modules/secrets/                # Secrets Manager (Snowflake + RDS creds)
+  modules/events/                 # EventBridge rules + Step Functions orchestration
+    step_functions.json           # Migration pipeline: Migration→Enrichment→Quality→Graph+Query
 gateway/tools/data_tools/         # Lambda-backed Gateway tools (shared)
   lambda_function.py              # 5 data tools (connect, scan, profile, query, DDL)
 gateway/tools/snowflake_tools/    # Snowflake-specific Gateway tools
@@ -75,7 +86,12 @@ gateway/tools/iceberg_tools/      # Iceberg operations Gateway tools
   lambda_function.py              # convert_to_iceberg, export_data, register_glue_catalog
 gateway/mcp/dbt-mcp-config.json   # dbt MCP server config with per-agent tool groups
 frontend/                         # React + Vite + TypeScript + shadcn/ui
-eval/                             # Evaluation scripts + test cases
+eval/                             # Evaluation scripts + test cases (25 cases across 5 agents)
+  test_cases/migration_agent.json # 5 test cases (schema, DDL, strategy, dbt, validation)
+  test_cases/enrichment_agent.json # 4 test cases (descriptions, columns, synonyms, catalog)
+  test_cases/quality_agent.json   # 4 test cases (rules, checks, dbt tests, remediation)
+  test_cases/mapping_agent.json   # 4 test cases (entities, joins, triples, Neptune)
+  test_cases/query_agent.json     # 8 test cases (intent, schema, SQL, cache, self-correction)
 docker/docker-compose.yml         # Local dev compose (agent + frontend)
 docs/adr/                         # Architecture Decision Records (14 ADRs)
 dbt_output/northwinds_dw/         # Generated dbt project (14 models, compiles clean)
@@ -173,6 +189,7 @@ The agent supports multiple database backends via the `DatabaseDriver` protocol 
 - **RDS**: Provisioned by `scripts/bootstrap.sh` — PostgreSQL 16.6, db.t3.micro, Northwinds dataset
 - **Redshift**: Provisioned by `scripts/bootstrap.sh` — Serverless, 8 base RPU, Northwinds dataset
 - **Bedrock models**: us.anthropic.claude-sonnet-4, us.anthropic.claude-opus-4
+- **Snowflake**: Pinnacle Financial demo — account `lga76011`, database `PINNACLE_FINANCIAL_DEMO_ASINGH`, schema `ANALYTICS`, SSO via `externalbrowser`
 
 ### Bootstrap creates:
 - Security group (`platform-agent-rds-sg`, ports 5432 + 5439 open)
@@ -220,13 +237,13 @@ Phases completed:
 
 Branch `snow-iceberg-migration` implements a multi-agent architecture for migrating Snowflake environments to AWS via Apache Iceberg:
 
-| Agent | Pattern Dir | Role |
-|-------|------------|------|
-| Migration | `patterns/migration-agent/` | Extract Snowflake schema → Iceberg DDL → S3 export → Glue Catalog → dbt scaffold |
-| Enrichment | `patterns/enrichment-agent/` | RAG descriptions, DataZone AcceptPredictions, semantic YAML generation |
-| Quality | `patterns/quality-agent/` | DQDL rules, Glue Data Quality, quarantine, dbt test, auto-remediation |
-| Mapping | `patterns/mapping-agent/` | Entity extraction, Neptune graph, RDF triples, dbt lineage |
-| Query | `patterns/query-agent/` | NL-to-SQL, semantic cache (ElastiCache), self-correction, dbt metrics |
+| Agent | Tools | Role | Verified |
+|-------|-------|------|----------|
+| Migration | 5 | Extract Snowflake schema → Iceberg DDL → dbt scaffold → row count validation | dbt 9/9 run, 18/18 test ✅ |
+| Enrichment | 3 | Generate descriptions (LLM + RAG), update catalog (Snowflake/Glue), synonym maps | 33 columns described ✅ |
+| Quality | 4 | DQDL rules, quality checks, dbt test generation, quarantine + remediation | 21 rules, 13 checks PASS ✅ |
+| Mapping | 3 | Entity/relationship extraction, RDF triples, Neptune graph loading | 143 nodes, 793 triples ✅ |
+| Query | 5 | Intent classification, EXPLAIN validation, self-correction, semantic cache | Top-5 clients query ✅ |
 
 ### Snowflake Connection (Pinnacle Financial)
 
@@ -269,7 +286,7 @@ uv run dbt run --profiles-dir .      # Materialize to RDS
 uv run streamlit run streamlit_app/app.py --server.port 8501
 ```
 
-The app connects to any PostgreSQL or Redshift database (selectable via Database Type dropdown), runs `scan_metadata` to discover the schema, then accepts NL questions. The agent uses `run_query` to answer with actual data.
+The app connects to any PostgreSQL, Redshift, or Snowflake database (selectable via Database Type dropdown), runs `scan_metadata` to discover the schema, then accepts NL questions. The agent uses `run_query` to answer with actual data. Snowflake SSO (`externalbrowser`) opens a browser for Okta/SAML login.
 
 ## AgentCore Deployment
 
