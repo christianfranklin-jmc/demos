@@ -25,7 +25,7 @@ from ag_ui.core import (
 from bedrock_agentcore.runtime import serve_ag_ui
 
 from .agent import create_agent
-from .tools._toolkit_client import connect
+from .drivers import create_driver, list_sources
 
 
 def _build_agent() -> Any:
@@ -66,16 +66,18 @@ async def handler(run_input: RunAgentInput) -> AsyncIterator:
     # Auto-connect if DB env vars are set and no session exists
     db_host = os.environ.get("DB_HOST")
     if db_host:
-        from .tools._toolkit_client import _sessions
-        source_id = f"rds_postgresql_{os.environ.get('DB_NAME', 'db')}"
-        if source_id not in _sessions:
-            connect(
+        driver_type = os.environ.get("DB_DRIVER_TYPE", "postgresql")
+        db_name = os.environ.get("DB_NAME", "db")
+        source_id = f"{driver_type}_{db_name}"
+        if source_id not in list_sources():
+            create_driver(
+                driver_type=driver_type,
+                source_id=source_id,
                 host=db_host,
                 port=int(os.environ.get("DB_PORT", "5432")),
-                database=os.environ.get("DB_NAME", ""),
+                database=db_name,
                 user=os.environ.get("DB_USER", ""),
                 password=os.environ.get("DB_PASSWORD", ""),
-                source_id=source_id,
             )
             user_prompt = (
                 f"The database is connected with source_id='{source_id}'. "

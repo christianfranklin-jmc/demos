@@ -17,6 +17,10 @@ An ADR is a short document that captures a significant architectural or technica
 | [005](005-demo-database.md) | Demo Database | Accepted | 2026-03-21 |
 | [006](006-data-connectivity-layer.md) | Data Connectivity Layer | Accepted | 2026-03-21 |
 | [007](007-agentcore-serving-pattern.md) | AgentCore Serving Pattern | Accepted | 2026-03-21 |
+| [008](008-fast-integration.md) | FAST Template Integration (Terraform) | Accepted | 2026-03-26 |
+| [009](009-multi-database-abstraction.md) | Multi-Database Abstraction Layer | Accepted | 2026-03-26 |
+| [010](010-agentcore-gateway-tool-routing.md) | AgentCore Gateway Tool Routing | Accepted | 2026-03-26 |
+| [011](011-agentcore-observability.md) | AgentCore Observability (OpenTelemetry) | Accepted | 2026-03-26 |
 
 ## Template
 

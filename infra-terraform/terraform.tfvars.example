@@ -1,0 +1,24 @@
+# Required — base name for all resources (max 35 chars)
+stack_name_base = "platform-agent-stack"
+
+# Optional — set to create an admin Cognito user
+# admin_user_email = "admin@example.com"
+
+# Backend configuration
+backend_pattern         = "platform-agent"
+backend_deployment_type = "docker"   # "docker" or "zip"
+backend_network_mode    = "PUBLIC"   # "PUBLIC" or "VPC"
+
+# VPC settings (required if backend_network_mode = "VPC")
+# backend_vpc_id                = "vpc-xxxxxxxx"
+# backend_vpc_subnet_ids        = ["subnet-aaa", "subnet-bbb"]
+# backend_vpc_security_group_ids = ["sg-xxxxxxxx"]
+
+# Database connection (for Gateway Lambda data tools)
+# These are set as Lambda env vars so tools can connect
+# db_host        = "my-cluster.xxxxx.us-east-1.rds.amazonaws.com"
+# db_port        = 5432
+# db_name        = "northwinds"
+# db_user        = "postgres"
+# db_password    = "secret"
+# db_driver_type = "postgresql"   # or "redshift"

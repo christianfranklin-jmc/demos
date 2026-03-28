@@ -1,0 +1,85 @@
+{
+  "tools": [
+    {
+      "name": "connect_to_database",
+      "description": "Connect to a database and validate connectivity. Returns connection status.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "host": { "type": "string", "description": "Database hostname or endpoint" },
+          "port": { "type": "integer", "description": "Database port (default: 5432 for PostgreSQL, 5439 for Redshift)" },
+          "database": { "type": "string", "description": "Database name" },
+          "user": { "type": "string", "description": "Database username" },
+          "password": { "type": "string", "description": "Database password" },
+          "driver_type": {
+            "type": "string",
+            "enum": ["postgresql", "redshift"],
+            "description": "Database driver type (default: postgresql)"
+          }
+        },
+        "required": ["host", "port", "database", "user", "password"]
+      }
+    },
+    {
+      "name": "scan_metadata",
+      "description": "Scan database metadata: tables, columns, primary keys, foreign keys, and row counts. Uses information_schema and database-specific system views.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "driver_type": {
+            "type": "string",
+            "enum": ["postgresql", "redshift"],
+            "description": "Database driver type (default: postgresql)"
+          }
+        }
+      }
+    },
+    {
+      "name": "profile_database",
+      "description": "Profile database columns: cardinality, null rates, min/max values, and sample data.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "driver_type": {
+            "type": "string",
+            "enum": ["postgresql", "redshift"],
+            "description": "Database driver type (default: postgresql)"
+          }
+        }
+      }
+    },
+    {
+      "name": "run_query",
+      "description": "Execute a read-only SQL query and return structured results. Write statements (INSERT, UPDATE, DELETE, DROP, etc.) are blocked.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sql": { "type": "string", "description": "The SQL query to execute (read-only)" },
+          "max_rows": { "type": "integer", "description": "Maximum rows to return (default: 100)" },
+          "driver_type": {
+            "type": "string",
+            "enum": ["postgresql", "redshift"],
+            "description": "Database driver type (default: postgresql)"
+          }
+        },
+        "required": ["sql"]
+      }
+    },
+    {
+      "name": "execute_ddl",
+      "description": "Execute a DDL or write statement. DROP and TRUNCATE are permanently blocked for safety.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sql": { "type": "string", "description": "The DDL statement to execute" },
+          "driver_type": {
+            "type": "string",
+            "enum": ["postgresql", "redshift"],
+            "description": "Database driver type (default: postgresql)"
+          }
+        },
+        "required": ["sql"]
+      }
+    }
+  ]
+}

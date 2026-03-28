@@ -31,6 +31,21 @@ streamlit_app/.streamlit/secrets.toml
 # AWS / AgentCore
 .bedrock_agentcore.yaml
 
+# Build artifacts
+.build/
+
+# Terraform
+infra-terraform/.terraform/
+infra-terraform/*.tfstate
+infra-terraform/*.tfstate.*
+infra-terraform/.terraform.lock.hcl
+infra-terraform/terraform.tfvars
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+.vite/
+
 # phData Toolkit
 toolkit.conf
 lib/
