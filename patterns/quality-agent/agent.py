@@ -24,6 +24,8 @@ from bedrock_agentcore.runtime import BedrockAgentCoreApp, RequestContext
 from prompts.system import SYSTEM_PROMPT
 from strands import Agent
 from strands.models import BedrockModel
+from tools.quality_rules import generate_dbt_tests, generate_quality_rules
+from tools.quarantine import generate_remediation_plan, identify_quality_failures
 
 logger = logging.getLogger(__name__)
 
@@ -33,8 +35,13 @@ logger = logging.getLogger(__name__)
 
 app = BedrockAgentCoreApp()
 
-# Direct tools (none initially — all tools come via Gateway MCP)
-DIRECT_TOOLS: list = []
+# Direct tools — Quality Agent's specialized capabilities
+DIRECT_TOOLS: list = [
+    generate_quality_rules,
+    generate_dbt_tests,
+    identify_quality_failures,
+    generate_remediation_plan,
+]
 
 
 # ---------------------------------------------------------------------------

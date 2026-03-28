@@ -24,6 +24,8 @@ from bedrock_agentcore.runtime import BedrockAgentCoreApp, RequestContext
 from prompts.system import SYSTEM_PROMPT
 from strands import Agent
 from strands.models import BedrockModel
+from tools.generate_descriptions import generate_descriptions
+from tools.update_catalog import build_synonym_map, update_catalog_descriptions
 
 logger = logging.getLogger(__name__)
 
@@ -33,8 +35,12 @@ logger = logging.getLogger(__name__)
 
 app = BedrockAgentCoreApp()
 
-# Direct tools (none initially — all tools come via Gateway MCP)
-DIRECT_TOOLS: list = []
+# Direct tools — Enrichment Agent's specialized capabilities
+DIRECT_TOOLS: list = [
+    generate_descriptions,
+    update_catalog_descriptions,
+    build_synonym_map,
+]
 
 
 # ---------------------------------------------------------------------------
