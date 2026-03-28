@@ -21,6 +21,9 @@ An ADR is a short document that captures a significant architectural or technica
 | [009](009-multi-database-abstraction.md) | Multi-Database Abstraction Layer | Accepted | 2026-03-26 |
 | [010](010-agentcore-gateway-tool-routing.md) | AgentCore Gateway Tool Routing | Accepted | 2026-03-26 |
 | [011](011-agentcore-observability.md) | AgentCore Observability (OpenTelemetry) | Accepted | 2026-03-26 |
+| [012](012-multi-agent-orchestration.md) | Multi-Agent Orchestration (Step Functions) | Accepted | 2026-03-27 |
+| [013](013-snowflake-iceberg-migration.md) | Snowflake → AWS Migration via Apache Iceberg | Accepted | 2026-03-27 |
+| [014](014-dbt-mcp-integration.md) | dbt MCP Server Integration | Accepted | 2026-03-27 |
 
 ## Template
 

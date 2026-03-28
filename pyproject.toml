@@ -23,6 +23,7 @@ redshift = [
 ]
 snowflake = [
     "snowflake-connector-python>=3.0",
+    "dbt-snowflake>=1.9",
 ]
 databricks = [
     "databricks-sql-connector>=3.0",

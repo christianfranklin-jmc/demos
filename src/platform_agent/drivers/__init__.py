@@ -24,6 +24,12 @@ try:
 except ImportError:
     pass
 
+try:
+    from .snowflake import SnowflakeDriver
+    DRIVER_REGISTRY["snowflake"] = SnowflakeDriver
+except ImportError:
+    pass
+
 # Active driver instances keyed by source_id
 _drivers: dict[str, DatabaseDriver] = {}
 
