@@ -24,6 +24,13 @@ from bedrock_agentcore.runtime import BedrockAgentCoreApp, RequestContext
 from prompts.system import SYSTEM_PROMPT
 from strands import Agent
 from strands.models import BedrockModel
+from tools.query_pipeline import (
+    cache_query_result,
+    check_query_cache,
+    classify_query_intent,
+    get_table_schema_for_query,
+    validate_and_execute_query,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -33,8 +40,14 @@ logger = logging.getLogger(__name__)
 
 app = BedrockAgentCoreApp()
 
-# Direct tools (none initially — all tools come via Gateway MCP)
-DIRECT_TOOLS: list = []
+# Direct tools — Query Agent's specialized capabilities
+DIRECT_TOOLS: list = [
+    classify_query_intent,
+    check_query_cache,
+    get_table_schema_for_query,
+    validate_and_execute_query,
+    cache_query_result,
+]
 
 
 # ---------------------------------------------------------------------------

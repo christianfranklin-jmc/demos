@@ -24,6 +24,11 @@ from bedrock_agentcore.runtime import BedrockAgentCoreApp, RequestContext
 from prompts.system import SYSTEM_PROMPT
 from strands import Agent
 from strands.models import BedrockModel
+from tools.knowledge_graph import (
+    extract_entities_and_relationships,
+    generate_rdf_triples,
+    load_to_neptune,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -33,8 +38,12 @@ logger = logging.getLogger(__name__)
 
 app = BedrockAgentCoreApp()
 
-# Direct tools (none initially — all tools come via Gateway MCP)
-DIRECT_TOOLS: list = []
+# Direct tools — Mapping Agent's specialized capabilities
+DIRECT_TOOLS: list = [
+    extract_entities_and_relationships,
+    generate_rdf_triples,
+    load_to_neptune,
+]
 
 
 # ---------------------------------------------------------------------------
