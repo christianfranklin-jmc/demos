@@ -24,6 +24,9 @@ from bedrock_agentcore.runtime import BedrockAgentCoreApp, RequestContext
 from prompts.system import SYSTEM_PROMPT
 from strands import Agent
 from strands.models import BedrockModel
+from tools.convert_to_iceberg import generate_iceberg_ddl
+from tools.extract_schema import extract_snowflake_schema
+from tools.validate_migration import generate_validation_report, validate_row_counts
 
 logger = logging.getLogger(__name__)
 
@@ -33,8 +36,13 @@ logger = logging.getLogger(__name__)
 
 app = BedrockAgentCoreApp()
 
-# Direct tools (none initially — all tools come via Gateway MCP)
-DIRECT_TOOLS: list = []
+# Direct tools — Migration Agent's specialized capabilities
+DIRECT_TOOLS: list = [
+    extract_snowflake_schema,
+    generate_iceberg_ddl,
+    validate_row_counts,
+    generate_validation_report,
+]
 
 
 # ---------------------------------------------------------------------------
