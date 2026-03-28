@@ -26,6 +26,7 @@ from strands import Agent
 from strands.models import BedrockModel
 from tools.convert_to_iceberg import generate_iceberg_ddl
 from tools.extract_schema import extract_snowflake_schema
+from tools.scaffold_dbt_project import scaffold_migration_dbt_project
 from tools.validate_migration import generate_validation_report, validate_row_counts
 
 logger = logging.getLogger(__name__)
@@ -40,6 +41,7 @@ app = BedrockAgentCoreApp()
 DIRECT_TOOLS: list = [
     extract_snowflake_schema,
     generate_iceberg_ddl,
+    scaffold_migration_dbt_project,
     validate_row_counts,
     generate_validation_report,
 ]
