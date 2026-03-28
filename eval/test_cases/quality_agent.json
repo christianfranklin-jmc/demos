@@ -1,0 +1,26 @@
+[
+  {
+    "name": "quality_rule_generation",
+    "prompt": "Generate data quality rules for FACT_REVENUE and DIM_CLIENT tables.",
+    "expected_tools": ["generate_quality_rules"],
+    "expected_contains": ["NOT_NULL", "UNIQUE", "REFERENTIAL_INTEGRITY"]
+  },
+  {
+    "name": "quality_check_execution",
+    "prompt": "Run quality checks on FACT_REVENUE. Check for nulls, duplicates, and orphan keys.",
+    "expected_tools": ["identify_quality_failures"],
+    "expected_contains": ["null_check", "duplicate", "orphan_key", "PASS"]
+  },
+  {
+    "name": "dbt_test_generation",
+    "prompt": "Generate dbt schema tests for the Pinnacle Financial staging models.",
+    "expected_tools": ["generate_dbt_tests"],
+    "expected_contains": ["unique", "not_null", "schema"]
+  },
+  {
+    "name": "remediation_plan",
+    "prompt": "There are NULL values in the CLIENT_KEY column of FACT_REVENUE. Generate a remediation plan.",
+    "expected_tools": ["generate_remediation_plan"],
+    "expected_contains": ["quarantine", "remediation"]
+  }
+]
