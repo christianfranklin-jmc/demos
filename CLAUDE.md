@@ -9,9 +9,11 @@ AI-powered data engineering agent that automates the journey from raw database s
 - **LLM**: Amazon Bedrock — Claude Sonnet 4 (default), Opus 4 (complex tasks)
 - **Deployment**: Amazon Bedrock AgentCore Runtime (FAST template, Docker)
 - **Infrastructure**: Terraform (FAST `infra-terraform/` three-module hierarchy)
-- **Data Layer**: Multi-database driver abstraction (`DatabaseDriver` protocol) — PostgreSQL (psycopg2), Redshift (redshift_connector), Snowflake/Databricks (future). phData Toolkit CLI as optional enhancement.
-- **Transforms**: dbt-postgres, dbt-redshift (driver-selected)
-- **Gateway**: AgentCore MCP Gateway — 5 data tools as Lambda targets
+- **Data Layer**: Multi-database driver abstraction (`DatabaseDriver` protocol) — PostgreSQL (psycopg2), Redshift (redshift_connector), Snowflake (snowflake-connector-python). phData Toolkit CLI as optional enhancement.
+- **Transforms**: dbt-postgres, dbt-redshift, dbt-snowflake (driver-selected)
+- **Migration**: Snowflake → Apache Iceberg (S3/Parquet + Glue Catalog)
+- **dbt MCP**: dbt-labs/dbt-mcp v1.9.3 — 40+ tools for compile, run, test, semantic layer queries, lineage
+- **Gateway**: AgentCore MCP Gateway — data tools + Snowflake tools + Iceberg tools as Lambda targets
 - **Observability**: OpenTelemetry auto-instrumentation → CloudWatch Traces
 - **Evaluation**: AgentCore built-in evaluators (on-demand + online)
 - **Auth**: Amazon Cognito (JWT for frontend, OAuth2 M2M for Gateway)
@@ -32,6 +34,7 @@ src/platform_agent/               # Agent source code
     __init__.py                   # Driver registry + create_driver()/get_driver()
     postgresql.py                 # PostgreSQL driver (psycopg2)
     redshift.py                   # Redshift driver (redshift_connector)
+    snowflake.py                  # Snowflake driver (snowflake-connector-python, SSO)
   tools/
     _toolkit_client.py            # Adapter: Toolkit CLI + driver layer
     toolkit_connect.py            # @tool connect_to_database (driver_type param)
@@ -40,11 +43,21 @@ src/platform_agent/               # Agent source code
     toolkit_ddl.py                # @tool execute_ddl (DROP/TRUNCATE blocked)
     dbt_generate.py               # @tool generate_dbt_project (star schema → dbt)
     semantic_layer.py             # @tool generate_semantic_layer (MetricFlow YAML)
-patterns/platform-agent/          # FAST agent pattern (AgentCore Runtime)
+patterns/platform-agent/          # FAST agent pattern — generic data engineering
   agent.py                        # BedrockAgentCoreApp + @app.entrypoint
   Dockerfile                      # Container image with OTel instrumentation
   tools/                          # Direct tools (dbt_generate, semantic_layer)
   prompts/                        # System prompt (copied from src/)
+patterns/migration-agent/         # Snowflake → Iceberg migration agent
+  agent.py                        # BedrockAgentCoreApp with migration tools
+  tools/extract_schema.py         # Enriched Snowflake schema analysis
+  tools/convert_to_iceberg.py     # Iceberg DDL generation + type mapping
+  tools/validate_migration.py     # Row count validation + reporting
+  prompts/system.py               # Migration workflow (7 phases)
+patterns/enrichment-agent/        # RAG descriptions + DataZone + semantic YAML
+patterns/quality-agent/           # DQDL rules + quarantine + dbt test
+patterns/mapping-agent/           # Neptune graph + entity extraction + dbt lineage
+patterns/query-agent/             # NL-to-SQL + semantic cache + self-correction
 patterns/utils/                   # Shared utilities (from FAST template)
   auth.py                         # JWT extraction + OAuth2 token management
   ssm.py                          # SSM parameter retrieval
@@ -54,12 +67,17 @@ infra-terraform/                  # Terraform infrastructure (FAST template)
   modules/amplify-hosting/        # S3 + Amplify App
   modules/cognito/                # User Pool + OAuth2 clients
   modules/backend/                # Runtime, Gateway, Memory, OAuth2 provider
-gateway/tools/data_tools/         # Lambda-backed Gateway tools
+gateway/tools/data_tools/         # Lambda-backed Gateway tools (shared)
   lambda_function.py              # 5 data tools (connect, scan, profile, query, DDL)
+gateway/tools/snowflake_tools/    # Snowflake-specific Gateway tools
+  lambda_function.py              # extract_semantic_metadata, validate_row_counts
+gateway/tools/iceberg_tools/      # Iceberg operations Gateway tools
+  lambda_function.py              # convert_to_iceberg, export_data, register_glue_catalog
+gateway/mcp/dbt-mcp-config.json   # dbt MCP server config with per-agent tool groups
 frontend/                         # React + Vite + TypeScript + shadcn/ui
 eval/                             # Evaluation scripts + test cases
 docker/docker-compose.yml         # Local dev compose (agent + frontend)
-docs/adr/                         # Architecture Decision Records (11 ADRs)
+docs/adr/                         # Architecture Decision Records (14 ADRs)
 dbt_output/northwinds_dw/         # Generated dbt project (14 models, compiles clean)
 tests/                            # Unit and integration tests
 streamlit_app/app.py              # Streamlit TTYD app (preserved as alternative)
@@ -109,6 +127,7 @@ To tear down: `./scripts/teardown.sh --profile AdministratorAccess-637119802057`
 ```bash
 uv pip install -e ".[dev]"              # Install core deps
 uv pip install -e ".[redshift]"         # Add Redshift driver support
+uv pip install -e ".[snowflake]"        # Add Snowflake driver support
 uv pip install -e ".[otel]"             # Add OpenTelemetry support
 uv run pytest                           # Run tests
 uv run ruff check src/ tests/ patterns/ # Lint
@@ -133,11 +152,11 @@ The agent supports multiple database backends via the `DatabaseDriver` protocol 
 |----------|--------|---------|-------------|
 | PostgreSQL | psycopg2 | (included) | dbt-postgres |
 | Redshift | redshift_connector | `uv pip install -e ".[redshift]"` | dbt-redshift |
+| Snowflake | snowflake-connector-python | `uv pip install -e ".[snowflake]"` | dbt-snowflake |
 
 **Planned:**
 | Database | Driver | Install | dbt Adapter |
 |----------|--------|---------|-------------|
-| Snowflake | snowflake-connector-python | `uv pip install -e ".[snowflake]"` | dbt-snowflake |
 | Databricks | databricks-sql-connector | `uv pip install -e ".[databricks]"` | dbt-databricks |
 
 **Adding a new database:**
@@ -194,6 +213,46 @@ Phases completed:
 - **Phase 6**: AgentCore deployment — `serve.py` AG-UI protocol adapter
 
 - **Phase 7**: FAST template integration — Terraform infrastructure (3-module hierarchy), multi-database driver abstraction (PostgreSQL + Redshift), AgentCore Gateway (5 Lambda tools), AgentCore Memory (30-day retention), Observability (OTel auto-instrumentation → CloudWatch), Evaluation (on-demand + 10% online sampling), React frontend (Vite + TypeScript + agentcore-client SSE), Cognito auth (JWT + OAuth2 M2M), Docker Compose local dev. ADRs 008-011. Branch: `redshift-agentcore-dbt`.
+
+- **Phase 8**: Snow-Iceberg Migration — 5 autonomous agents for Snowflake → AWS migration via Apache Iceberg. SnowflakeDriver (SSO/externalbrowser + password auth), Migration Agent (extract_schema, convert_to_iceberg, validate_migration), Enrichment Agent (RAG + DataZone + semantic YAML), Quality Agent (DQDL + quarantine + dbt test), Mapping Agent (Neptune graph + dbt lineage), Query Agent (NL-to-SQL + semantic cache). dbt MCP server integration (40+ tools). Gateway Lambda extensions (snowflake_tools, iceberg_tools). Terraform modules for data services (S3, Glue, Neptune, ElastiCache), secrets, and events (EventBridge + Step Functions). ADRs 012-014. Branch: `snow-iceberg-migration`. Tested against Pinnacle Financial (PINNACLE_FINANCIAL_DEMO_ASINGH).
+
+## Snowflake → Iceberg Migration (5 Agents)
+
+Branch `snow-iceberg-migration` implements a multi-agent architecture for migrating Snowflake environments to AWS via Apache Iceberg:
+
+| Agent | Pattern Dir | Role |
+|-------|------------|------|
+| Migration | `patterns/migration-agent/` | Extract Snowflake schema → Iceberg DDL → S3 export → Glue Catalog → dbt scaffold |
+| Enrichment | `patterns/enrichment-agent/` | RAG descriptions, DataZone AcceptPredictions, semantic YAML generation |
+| Quality | `patterns/quality-agent/` | DQDL rules, Glue Data Quality, quarantine, dbt test, auto-remediation |
+| Mapping | `patterns/mapping-agent/` | Entity extraction, Neptune graph, RDF triples, dbt lineage |
+| Query | `patterns/query-agent/` | NL-to-SQL, semantic cache (ElastiCache), self-correction, dbt metrics |
+
+### Snowflake Connection (Pinnacle Financial)
+
+```bash
+uv pip install -e ".[snowflake]"
+source .env  # Includes SF_ACCOUNT, SF_USER, SF_ROLE, SF_WAREHOUSE, SF_DATABASE, SF_SCHEMA
+uv run streamlit run streamlit_app/app.py --server.port 8501
+# Select "snowflake" as Database Type, fill in Snowflake fields
+```
+
+SSO via `externalbrowser` authenticator — opens browser for Okta/SAML login.
+
+### dbt MCP Integration
+
+```bash
+# Install dbt MCP server
+./scripts/setup-dbt-mcp.sh --verify
+
+# Config at gateway/mcp/dbt-mcp-config.json
+# Per-agent tool groups: migration gets generate_*, query gets execute_sql, etc.
+```
+
+### Orchestration
+
+Step Functions state machine: Migration → Enrichment → Quality → Mapping → Query.
+EventBridge triggers for steady-state: schema change → re-enrich, quality failure → auto-remediate.
 
 ## dbt Project (Northwinds)
 
