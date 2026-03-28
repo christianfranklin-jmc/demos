@@ -36,6 +36,7 @@ class SnowflakeDriver:
         database: str = "",
         schema: str = "PUBLIC",
         role: str = "",
+        authenticator: str = "",
         **kwargs: Any,
     ) -> None:
         self.account = account
@@ -45,6 +46,7 @@ class SnowflakeDriver:
         self.database = database
         self.schema = schema
         self.role = role
+        self.authenticator = authenticator
         self._conn: Any = None
         # Accept host/port for compatibility with driver registry but ignore them
         # Snowflake uses account identifier, not host:port
@@ -55,11 +57,15 @@ class SnowflakeDriver:
         connect_params: dict[str, Any] = {
             "account": self.account,
             "user": self.user,
-            "password": self._password,
             "warehouse": self.warehouse,
             "database": self.database,
             "schema": self.schema,
         }
+        # Support multiple auth methods: password, externalbrowser, keypair
+        if self.authenticator:
+            connect_params["authenticator"] = self.authenticator
+        elif self._password:
+            connect_params["password"] = self._password
         if self.role:
             connect_params["role"] = self.role
 
