@@ -18,10 +18,20 @@
 #   - This repo checked out
 #
 # Usage:
-#   ./scripts/bootstrap.sh --profile <AWS_PROFILE> [--region <REGION>] [--password <DB_PASSWORD>]
+#   ./scripts/bootstrap.sh --profile <AWS_PROFILE> [--services <LIST>] [--region <REGION>]
 #
-# Example:
+# Services (comma-separated):
+#   rds       — PostgreSQL on RDS (default)
+#   redshift  — Redshift Serverless
+#   snowflake — Snowflake config generation (no AWS provisioning)
+#   all       — All of the above
+#
+# Examples:
 #   ./scripts/bootstrap.sh --profile AdministratorAccess-637119802057
+#   ./scripts/bootstrap.sh --profile AdministratorAccess-637119802057 --services rds
+#   ./scripts/bootstrap.sh --profile AdministratorAccess-637119802057 --services rds,redshift
+#   ./scripts/bootstrap.sh --profile AdministratorAccess-637119802057 --services snowflake
+#   ./scripts/bootstrap.sh --profile AdministratorAccess-637119802057 --services all
 
 set -euo pipefail
 
@@ -40,6 +50,16 @@ DB_ALLOCATED_STORAGE=20
 SG_NAME="platform-agent-rds-sg"
 SUBNET_GROUP_NAME="platform-agent-db-subnets"
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+SERVICES="rds"
+
+# Snowflake defaults (used with --services snowflake)
+SF_ACCOUNT=""
+SF_USER=""
+SF_WAREHOUSE="COMPUTE_WH"
+SF_DATABASE=""
+SF_SCHEMA="PUBLIC"
+SF_ROLE=""
+SF_AUTHENTICATOR="externalbrowser"
 
 # ---------------------------------------------------------------------------
 # Parse arguments
@@ -47,12 +67,25 @@ PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 AWS_PROFILE=""
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --profile)   AWS_PROFILE="$2"; shift 2 ;;
-        --region)    REGION="$2"; shift 2 ;;
-        --password)  DB_PASSWORD="$2"; shift 2 ;;
-        --instance-id) DB_INSTANCE_ID="$2"; shift 2 ;;
+        --profile)      AWS_PROFILE="$2"; shift 2 ;;
+        --region)       REGION="$2"; shift 2 ;;
+        --password)     DB_PASSWORD="$2"; shift 2 ;;
+        --instance-id)  DB_INSTANCE_ID="$2"; shift 2 ;;
+        --services)     SERVICES="$2"; shift 2 ;;
+        --sf-account)   SF_ACCOUNT="$2"; shift 2 ;;
+        --sf-user)      SF_USER="$2"; shift 2 ;;
+        --sf-warehouse) SF_WAREHOUSE="$2"; shift 2 ;;
+        --sf-database)  SF_DATABASE="$2"; shift 2 ;;
+        --sf-schema)    SF_SCHEMA="$2"; shift 2 ;;
+        --sf-role)      SF_ROLE="$2"; shift 2 ;;
         -h|--help)
-            echo "Usage: $0 --profile <AWS_PROFILE> [--region <REGION>] [--password <DB_PASSWORD>]"
+            echo "Usage: $0 --profile <AWS_PROFILE> [--services <LIST>] [--region <REGION>]"
+            echo ""
+            echo "Services (comma-separated): rds, redshift, snowflake, all"
+            echo "Default: rds"
+            echo ""
+            echo "Snowflake flags (used with --services snowflake):"
+            echo "  --sf-account, --sf-user, --sf-warehouse, --sf-database, --sf-schema, --sf-role"
             exit 0 ;;
         *) echo "Unknown option: $1"; exit 1 ;;
     esac
@@ -63,13 +96,29 @@ if [[ -z "$AWS_PROFILE" ]]; then
     exit 1
 fi
 
+# Parse services into flags
+DO_RDS=false
+DO_REDSHIFT=false
+DO_SNOWFLAKE=false
+
+IFS=',' read -ra SVC_ARRAY <<< "$SERVICES"
+for svc in "${SVC_ARRAY[@]}"; do
+    case "$(echo "$svc" | tr '[:upper:]' '[:lower:]' | xargs)" in
+        rds)       DO_RDS=true ;;
+        redshift)  DO_REDSHIFT=true ;;
+        snowflake) DO_SNOWFLAKE=true ;;
+        all)       DO_RDS=true; DO_REDSHIFT=true; DO_SNOWFLAKE=true ;;
+        *) echo "ERROR: Unknown service '$svc'. Valid: rds, redshift, snowflake, all"; exit 1 ;;
+    esac
+done
+
 export AWS_PROFILE AWS_DEFAULT_REGION="$REGION"
 AWS="aws"
 
 echo "=== AWS Platform Agent Bootstrap ==="
 echo "Profile:  $AWS_PROFILE"
 echo "Region:   $REGION"
-echo "Instance: $DB_INSTANCE_ID"
+echo "Services: $SERVICES"
 echo ""
 
 # ---------------------------------------------------------------------------
@@ -222,6 +271,10 @@ fi
 # ---------------------------------------------------------------------------
 # Step 4: RDS instance
 # ---------------------------------------------------------------------------
+DB_ENDPOINT=""
+DB_PORT=""
+
+if [[ "$DO_RDS" == "true" ]]; then
 echo ""
 echo "--- Step 4: RDS instance ---"
 DB_STATUS=$($AWS rds describe-db-instances \
@@ -250,6 +303,12 @@ if [[ "$DB_STATUS" == "not-found" ]]; then
     echo "RDS instance creation initiated."
 else
     echo "RDS instance already exists (status: $DB_STATUS)"
+    # Reset password to ensure it matches the script's value
+    echo "Resetting master password to ensure consistency..."
+    $AWS rds modify-db-instance \
+        --db-instance-identifier "$DB_INSTANCE_ID" \
+        --master-user-password "$DB_PASSWORD" \
+        --apply-immediately > /dev/null 2>&1 || true
 fi
 
 # ---------------------------------------------------------------------------
@@ -267,6 +326,12 @@ DB_PORT=$($AWS rds describe-db-instances \
     --db-instance-identifier "$DB_INSTANCE_ID" \
     --query 'DBInstances[0].Endpoint.Port' --output text)
 echo "RDS available at: $DB_ENDPOINT:$DB_PORT"
+
+# Wait briefly for password change to take effect (if modified above)
+if [[ "$DB_STATUS" != "not-found" ]]; then
+    echo "Waiting 15s for password change to propagate..."
+    sleep 15
+fi
 
 # ---------------------------------------------------------------------------
 # Step 6: Seed the database
@@ -291,9 +356,18 @@ else
     echo "Northwinds data loaded."
 fi
 
+else
+    echo ""
+    echo "--- Skipping RDS (not in --services) ---"
+fi  # DO_RDS
+
 # ---------------------------------------------------------------------------
 # Step 7: Redshift Serverless
 # ---------------------------------------------------------------------------
+RS_ENDPOINT=""
+RS_PORT=5439
+
+if [[ "$DO_REDSHIFT" == "true" ]]; then
 echo ""
 echo "--- Step 7: Redshift Serverless ---"
 
@@ -328,7 +402,6 @@ RS_WG_STATUS=$($AWS redshift-serverless describe-workgroup \
 
 if [[ "$RS_WG_STATUS" == "not-found" ]]; then
     echo "Creating Redshift Serverless workgroup: $RS_WORKGROUP..."
-    # Use the same security group and subnets as RDS for network access
     $AWS redshift-serverless create-workgroup \
         --workgroup-name "$RS_WORKGROUP" \
         --namespace-name "$RS_NAMESPACE" \
@@ -369,7 +442,35 @@ else
     echo "Redshift Serverless available at: ${RS_ENDPOINT}:${RS_PORT}"
 fi
 
-# Seed Northwinds into Redshift (if available and not already seeded)
+# Wait for network connectivity (workgroup may show AVAILABLE before network is ready)
+if [[ "$RS_ENDPOINT" != "PENDING" ]]; then
+    echo "Verifying Redshift network connectivity..."
+    RS_CONNECTED=false
+    for attempt in {1..12}; do
+        if uv run python -c "
+import redshift_connector
+conn = redshift_connector.connect(host='${RS_ENDPOINT}', port=${RS_PORT},
+    database='${RS_DB_NAME}', user='${RS_ADMIN_USER}',
+    password='${RS_ADMIN_PASSWORD}', ssl=True, timeout=10)
+conn.close()
+print('OK')
+" 2>/dev/null | grep -q "OK"; then
+            echo "Redshift connectivity confirmed."
+            RS_CONNECTED=true
+            break
+        fi
+        echo "  Attempt $attempt/12 — waiting 10 seconds..."
+        sleep 10
+    done
+
+    if [[ "$RS_CONNECTED" != "true" ]]; then
+        echo "WARNING: Could not connect to Redshift after 2 minutes."
+        echo "  The workgroup may need more time. Try again later or check the console."
+        RS_ENDPOINT="PENDING"
+    fi
+fi
+
+# Seed Northwinds into Redshift (if connected and not already seeded)
 if [[ "$RS_ENDPOINT" != "PENDING" ]]; then
     echo "Seeding Northwinds data into Redshift..."
     if command -v uv &> /dev/null && uv run python -c "import redshift_connector" 2>/dev/null; then
@@ -398,22 +499,64 @@ cur.close(); conn.close()
     else
         echo "WARNING: redshift_connector not installed. Skipping Redshift seed."
         echo "  Install with: uv pip install -e '.[redshift]'"
-        echo "  Then seed manually via the Streamlit app or CLI agent."
     fi
 fi
 
+else
+    echo ""
+    echo "--- Skipping Redshift (not in --services) ---"
+    RS_ENDPOINT=""
+    RS_PORT=5439
+    RS_DB_NAME="dev"
+    RS_ADMIN_USER="admin"
+    RS_ADMIN_PASSWORD="$DB_PASSWORD"
+fi  # DO_REDSHIFT
+
 # ---------------------------------------------------------------------------
-# Step 8: Generate config files
+# Step 8: Snowflake config (no AWS provisioning)
+# ---------------------------------------------------------------------------
+if [[ "$DO_SNOWFLAKE" == "true" ]]; then
+echo ""
+echo "--- Step 8: Snowflake configuration ---"
+
+# Prompt for credentials if not provided via flags
+if [[ -z "$SF_ACCOUNT" ]]; then
+    read -rp "  Snowflake account (e.g., lga76011): " SF_ACCOUNT
+fi
+if [[ -z "$SF_USER" ]]; then
+    read -rp "  Snowflake user (e.g., user@company.com): " SF_USER
+fi
+if [[ -z "$SF_DATABASE" ]]; then
+    read -rp "  Snowflake database: " SF_DATABASE
+fi
+if [[ -z "$SF_ROLE" ]]; then
+    read -rp "  Snowflake role (leave blank for default): " SF_ROLE
+fi
+
+echo "Snowflake config:"
+echo "  Account:   $SF_ACCOUNT"
+echo "  User:      $SF_USER"
+echo "  Warehouse: $SF_WAREHOUSE"
+echo "  Database:  $SF_DATABASE"
+echo "  Schema:    $SF_SCHEMA"
+echo "  Role:      ${SF_ROLE:-<default>}"
+echo "  Auth:      $SF_AUTHENTICATOR"
+fi
+
+# ---------------------------------------------------------------------------
+# Step 9: Generate config files (additive — preserves existing vars)
 # ---------------------------------------------------------------------------
 echo ""
-echo "--- Step 8: Generating config files ---"
+echo "--- Step 9: Generating config files ---"
 
-# .env file
-cat > "$PROJECT_DIR/.env" <<ENVEOF
-# AWS Platform Agent — generated by bootstrap.sh
+# Build .env content — start with common vars, add per-service blocks
+ENV_CONTENT="# AWS Platform Agent — generated by bootstrap.sh
 AWS_PROFILE=$AWS_PROFILE
 AWS_DEFAULT_REGION=$REGION
+"
 
+if [[ "$DO_RDS" == "true" && -n "$DB_ENDPOINT" ]]; then
+ENV_CONTENT+="
 # PostgreSQL (RDS) connection
 DB_HOST=$DB_ENDPOINT
 DB_PORT=$DB_PORT
@@ -421,17 +564,57 @@ DB_NAME=$DB_NAME
 DB_USER=$DB_USER
 DB_PASSWORD=$DB_PASSWORD
 DB_DRIVER_TYPE=postgresql
+"
+fi
 
+if [[ "$DO_REDSHIFT" == "true" ]]; then
+ENV_CONTENT+="
 # Redshift Serverless connection
-RS_HOST=$RS_ENDPOINT
+RS_HOST=${RS_ENDPOINT:-PENDING}
 RS_PORT=${RS_PORT:-5439}
-RS_DB_NAME=$RS_DB_NAME
-RS_USER=$RS_ADMIN_USER
-RS_PASSWORD=$RS_ADMIN_PASSWORD
-ENVEOF
+RS_DB_NAME=${RS_DB_NAME:-dev}
+RS_USER=${RS_ADMIN_USER:-admin}
+RS_PASSWORD=${RS_ADMIN_PASSWORD:-$DB_PASSWORD}
+"
+fi
+
+if [[ "$DO_SNOWFLAKE" == "true" && -n "$SF_ACCOUNT" ]]; then
+ENV_CONTENT+="
+# Snowflake connection
+SF_ACCOUNT=$SF_ACCOUNT
+SF_USER=$SF_USER
+SF_AUTHENTICATOR=$SF_AUTHENTICATOR
+SF_WAREHOUSE=$SF_WAREHOUSE
+SF_DATABASE=$SF_DATABASE
+SF_SCHEMA=$SF_SCHEMA
+SF_ROLE=$SF_ROLE
+"
+fi
+
+# Preserve existing .env vars that we're not overwriting
+if [[ -f "$PROJECT_DIR/.env" ]]; then
+    # Read existing vars, skip ones we're about to write
+    EXISTING_VARS=""
+    while IFS= read -r line; do
+        # Skip empty lines, comments, and vars we're replacing
+        [[ -z "$line" || "$line" == \#* ]] && continue
+        VAR_NAME="${line%%=*}"
+        if ! echo "$ENV_CONTENT" | grep -q "^${VAR_NAME}="; then
+            EXISTING_VARS+="$line"$'\n'
+        fi
+    done < "$PROJECT_DIR/.env"
+    if [[ -n "$EXISTING_VARS" ]]; then
+        ENV_CONTENT+="
+# Preserved from previous .env
+${EXISTING_VARS}"
+    fi
+fi
+
+echo "$ENV_CONTENT" > "$PROJECT_DIR/.env"
 echo "Created .env"
 
-# toolkit.conf
+# toolkit.conf (only if RDS is provisioned)
+if [[ "$DO_RDS" == "true" && -n "$DB_ENDPOINT" ]]; then
 cat > "$PROJECT_DIR/toolkit.conf" <<TKEOF
 connections {
   northwinds {
@@ -469,33 +652,40 @@ northwinds_dw:
       sslmode: require
 DBTEOF
 echo "Created dbt profiles.yml"
-
-# ---------------------------------------------------------------------------
-# Step 9: Install Python dependencies
-# ---------------------------------------------------------------------------
-echo ""
-echo "--- Step 9: Installing Python dependencies ---"
-cd "$PROJECT_DIR"
-if command -v uv &> /dev/null; then
-    uv pip install -e ".[dev]" 2>&1 | tail -1
-    uv pip install -e ".[redshift]" 2>&1 | tail -1
-    echo "Python dependencies installed via uv (core + redshift)."
-else
-    echo "WARNING: uv not found. Install with: curl -LsSf https://astral.sh/uv/install.sh | sh"
-    echo "Then run: uv pip install -e '.[dev]' && uv pip install -e '.[redshift]'"
 fi
 
 # ---------------------------------------------------------------------------
-# Step 10: Verify dbt
+# Step 10: Install Python dependencies
 # ---------------------------------------------------------------------------
 echo ""
-echo "--- Step 10: Verifying dbt project ---"
+echo "--- Step 10: Installing Python dependencies ---"
+cd "$PROJECT_DIR"
+if command -v uv &> /dev/null; then
+    uv pip install -e ".[dev]" 2>&1 | tail -1
+    if [[ "$DO_REDSHIFT" == "true" ]]; then
+        uv pip install -e ".[redshift]" 2>&1 | tail -1
+    fi
+    if [[ "$DO_SNOWFLAKE" == "true" ]]; then
+        uv pip install -e ".[snowflake]" 2>&1 | tail -1
+    fi
+    echo "Python dependencies installed via uv."
+else
+    echo "WARNING: uv not found. Install with: curl -LsSf https://astral.sh/uv/install.sh | sh"
+fi
+
+# ---------------------------------------------------------------------------
+# Step 11: Verify dbt (only if RDS was provisioned)
+# ---------------------------------------------------------------------------
+if [[ "$DO_RDS" == "true" && -n "$DB_ENDPOINT" ]]; then
+echo ""
+echo "--- Step 11: Verifying dbt project ---"
 cd "$PROJECT_DIR"
 if uv run dbt deps --project-dir dbt_output/northwinds_dw --profiles-dir dbt_output/northwinds_dw > /dev/null 2>&1; then
     uv run dbt compile --project-dir dbt_output/northwinds_dw --profiles-dir dbt_output/northwinds_dw > /dev/null 2>&1
     echo "dbt compile: OK"
 else
     echo "WARNING: dbt deps/compile failed. Run manually after checking profiles.yml."
+fi
 fi
 
 # ---------------------------------------------------------------------------
@@ -504,16 +694,18 @@ fi
 echo ""
 echo "=== Bootstrap complete ==="
 echo ""
-echo "PostgreSQL (RDS):  $DB_ENDPOINT:$DB_PORT"
-echo "Redshift:          ${RS_ENDPOINT:-PENDING}:${RS_PORT:-5439}"
-echo "Database:          $DB_NAME (PostgreSQL), $RS_DB_NAME (Redshift)"
-echo "Config files:      .env, toolkit.conf, dbt_output/northwinds_dw/profiles.yml"
+echo "Services provisioned: $SERVICES"
+if [[ "$DO_RDS" == "true" && -n "$DB_ENDPOINT" ]]; then
+    echo "PostgreSQL (RDS):  $DB_ENDPOINT:$DB_PORT"
+fi
+if [[ "$DO_REDSHIFT" == "true" ]]; then
+    echo "Redshift:          ${RS_ENDPOINT:-PENDING}:${RS_PORT:-5439}"
+fi
+if [[ "$DO_SNOWFLAKE" == "true" && -n "$SF_ACCOUNT" ]]; then
+    echo "Snowflake:         $SF_ACCOUNT ($SF_DATABASE.$SF_SCHEMA)"
+fi
+echo "Config files:      .env"
 echo ""
 echo "Next steps:"
 echo "  source .env"
-echo "  uv run python -m platform_agent --profile $AWS_PROFILE"
 echo "  uv run streamlit run streamlit_app/app.py --server.port 8501"
-echo ""
-echo "To connect to Redshift in the agent:"
-echo "  connect_to_database(host=RS_HOST, port=5439, database='dev', user='admin',"
-echo "                      password=..., driver_type='redshift')"
