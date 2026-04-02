@@ -16,10 +16,25 @@ variable "network_mode" { type = string }
 variable "pattern" { type = string }
 variable "user_pool_id" { type = string }
 variable "oidc_discovery_url" { type = string }
-variable "vpc_id" { type = string; default = null }
-variable "vpc_subnet_ids" { type = list(string); default = [] }
-variable "vpc_security_group_ids" { type = list(string); default = [] }
-variable "tags" { type = map(string); default = {} }
+variable "vpc_id" {
+  type    = string
+  default = null
+}
+
+variable "vpc_subnet_ids" {
+  type    = list(string)
+  default = []
+}
+
+variable "vpc_security_group_ids" {
+  type    = list(string)
+  default = []
+}
+
+variable "tags" {
+  type    = map(string)
+  default = {}
+}
 
 # --- Database connection variables (for Gateway Lambda env vars) ---
 
@@ -64,12 +79,12 @@ variable "db_driver_type" {
 
 output "runtime_id" {
   description = "AgentCore Runtime ID"
-  value       = aws_bedrockagentcore_runtime.main.runtime_id
+  value       = aws_bedrockagentcore_agent_runtime.main.agent_runtime_id
 }
 
 output "runtime_arn" {
   description = "AgentCore Runtime ARN"
-  value       = aws_bedrockagentcore_runtime.main.arn
+  value       = aws_bedrockagentcore_agent_runtime.main.agent_runtime_arn
 }
 
 output "gateway_id" {
@@ -79,7 +94,7 @@ output "gateway_id" {
 
 output "gateway_url" {
   description = "AgentCore Gateway URL"
-  value       = aws_bedrockagentcore_gateway.main.endpoint
+  value       = aws_bedrockagentcore_gateway.main.gateway_url
 }
 
 output "memory_arn" {
@@ -89,7 +104,7 @@ output "memory_arn" {
 
 output "memory_id" {
   description = "AgentCore Memory ID"
-  value       = aws_bedrockagentcore_memory.main.memory_id
+  value       = aws_bedrockagentcore_memory.main.id
 }
 
 output "ecr_repository_url" {

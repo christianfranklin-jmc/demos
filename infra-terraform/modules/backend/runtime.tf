@@ -137,10 +137,16 @@ resource "aws_iam_role_policy" "runtime" {
 
 # --- AgentCore Runtime ---
 
-resource "aws_bedrockagentcore_runtime" "main" {
-  name        = "${var.stack_name}-runtime"
-  description = "Platform Agent runtime for ${var.stack_name}"
-  role_arn    = aws_iam_role.runtime.arn
+resource "aws_bedrockagentcore_agent_runtime" "main" {
+  agent_runtime_name = "${var.stack_name}-runtime"
+  description        = "Platform Agent runtime for ${var.stack_name}"
+  role_arn           = aws_iam_role.runtime.arn
+
+  agent_runtime_artifact {
+    container_configuration {
+      container_uri = var.deployment_type == "docker" ? "${aws_ecr_repository.agent[0].repository_url}:latest" : null
+    }
+  }
 
   network_configuration {
     network_mode = var.network_mode

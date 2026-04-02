@@ -127,20 +127,21 @@ resource "time_sleep" "gateway_iam" {
 }
 
 resource "aws_bedrockagentcore_gateway" "main" {
-  name        = "${var.stack_name}-gateway"
-  description = "MCP Gateway for ${var.stack_name} data tools"
+  name           = "${var.stack_name}-gateway"
+  description    = "MCP Gateway for ${var.stack_name} data tools"
+  protocol_type  = "MCP"
+  authorizer_type = "CUSTOM_JWT"
+  role_arn       = aws_iam_role.gateway.arn
 
   protocol_configuration {
-    mcp {
-      version = "2025-03-26"
-    }
+    mcp {}
   }
 
   authorizer_configuration {
     custom_jwt_authorizer {
-      discovery_url          = var.oidc_discovery_url
-      allowed_audience       = []
-      allowed_clients        = []
+      discovery_url    = var.oidc_discovery_url
+      allowed_audience = []
+      allowed_clients  = []
     }
   }
 
@@ -152,18 +153,18 @@ resource "aws_bedrockagentcore_gateway" "main" {
 # --- Gateway Target: Data Tools Lambda ---
 
 resource "aws_bedrockagentcore_gateway_target" "data_tools" {
-  name       = "data-tools"
-  gateway_id = aws_bedrockagentcore_gateway.main.gateway_id
+  name               = "data-tools"
+  gateway_identifier = aws_bedrockagentcore_gateway.main.gateway_id
+  description        = "5 data tools: connect, scan, profile, query, DDL"
 
   target_configuration {
-    lambda {
-      lambda_arn = aws_lambda_function.data_tools.arn
+    mcp {
+      lambda {
+        lambda_arn = aws_lambda_function.data_tools.arn
+        tool_schema {}
+      }
     }
   }
-
-  description = "5 data tools: connect, scan, profile, query, DDL"
-
-  tags = var.tags
 }
 
 # Allow Gateway to invoke the Lambda
@@ -172,5 +173,5 @@ resource "aws_lambda_permission" "gateway_invoke" {
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.data_tools.function_name
   principal     = "bedrock-agentcore.amazonaws.com"
-  source_arn    = aws_bedrockagentcore_gateway.main.arn
+  source_arn    = aws_bedrockagentcore_gateway.main.gateway_arn
 }
