@@ -306,6 +306,7 @@ name = "aws-platform-agent"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "bedrock-agentcore", extra = ["ag-ui"] },
     { name = "boto3" },
     { name = "dbt-postgres" },
     { name = "psycopg2-binary" },
@@ -347,6 +348,7 @@ snowflake = [
 [package.metadata]
 requires-dist = [
     { name = "aws-opentelemetry-distro", marker = "extra == 'otel'", specifier = ">=0.5" },
+    { name = "bedrock-agentcore", extras = ["ag-ui"], specifier = ">=1.4.7" },
     { name = "bedrock-agentcore", extras = ["ag-ui"], marker = "extra == 'agentcore'", specifier = ">=0.1" },
     { name = "bedrock-agentcore-starter-toolkit", marker = "extra == 'eval'", specifier = ">=0.1" },
     { name = "boto3", specifier = ">=1.35" },
