@@ -78,17 +78,129 @@ def _render_chart(chart_data: dict) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Page config
+# Page config + phData branding
 # ---------------------------------------------------------------------------
-st.set_page_config(page_title="Talk To Your Data", page_icon="📊", layout="wide")
-st.title("Talk To Your Data")
-st.caption("Ask questions about your data in plain English. "
-           "The agent discovers the schema on connect — no prior knowledge required.")
+st.set_page_config(page_title="Talk To Your Data | phData", page_icon="📊", layout="wide")
+
+# phData brand palette — dark-mode native
+NAVY = "#1B2A4A"
+BLUE = "#2563EB"
+TEAL = "#0D9488"
+ORANGE = "#F97316"
+SURFACE_DARK = "#0F172A"
+SURFACE_CARD = "#1E293B"
+TEXT_PRIMARY = "#F1F5F9"
+TEXT_SECONDARY = "#94A3B8"
+
+st.markdown(f"""
+<style>
+    /* phData dark theme */
+    .stApp {{
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    }}
+    header[data-testid="stHeader"] {{
+        background-color: {SURFACE_DARK};
+    }}
+    /* Primary button */
+    .stButton > button[kind="primary"] {{
+        background-color: {BLUE};
+        border-color: {BLUE};
+        color: #FFFFFF;
+    }}
+    .stButton > button[kind="primary"]:hover {{
+        background-color: #1D4ED8;
+        border-color: #1D4ED8;
+    }}
+    /* Sidebar — dark surface, legible text */
+    section[data-testid="stSidebar"] {{
+        background-color: {SURFACE_DARK};
+    }}
+    section[data-testid="stSidebar"] .stMarkdown h2,
+    section[data-testid="stSidebar"] .stMarkdown h3 {{
+        color: {TEXT_PRIMARY};
+    }}
+    section[data-testid="stSidebar"] label {{
+        color: {TEXT_PRIMARY} !important;
+    }}
+    section[data-testid="stSidebar"] .stTextInput input,
+    section[data-testid="stSidebar"] .stNumberInput input,
+    section[data-testid="stSidebar"] .stSelectbox div[data-baseweb="select"] {{
+        color: {TEXT_PRIMARY};
+        background-color: {SURFACE_CARD};
+    }}
+    /* Chat messages */
+    .stChatMessage[data-testid="stChatMessage"] {{
+        border-radius: 8px;
+    }}
+    /* Tab accent */
+    .stTabs [data-baseweb="tab-highlight"] {{
+        background-color: {BLUE};
+    }}
+    /* Title styling */
+    .phdata-title {{
+        color: {TEXT_PRIMARY};
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: 0;
+        font-family: 'Inter', system-ui, sans-serif;
+    }}
+    .phdata-subtitle {{
+        color: {TEAL};
+        font-size: 1rem;
+        margin-top: 0;
+        font-family: 'Inter', system-ui, sans-serif;
+    }}
+    /* Backend mode badge */
+    .backend-badge {{
+        display: inline-block;
+        padding: 2px 10px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        font-family: 'Inter', system-ui, sans-serif;
+        margin-left: 8px;
+        vertical-align: middle;
+    }}
+    .badge-local {{
+        background-color: {SURFACE_CARD};
+        color: {TEAL};
+        border: 1px solid {TEAL};
+    }}
+    .badge-agentcore {{
+        background-color: {SURFACE_CARD};
+        color: {ORANGE};
+        border: 1px solid {ORANGE};
+    }}
+</style>
+""", unsafe_allow_html=True)
+
+# Detect AgentCore mode
+_agentcore_url = os.environ.get("AGENTCORE_RUNTIME_URL") or os.environ.get(
+    "AGENTCORE_ENDPOINT"
+)
+_is_agentcore = bool(_agentcore_url)
+_badge_class = "badge-agentcore" if _is_agentcore else "badge-local"
+_badge_label = "AgentCore" if _is_agentcore else "Local Agent"
+
+st.markdown(
+    f'<p class="phdata-title">Talk To Your Data'
+    f'<span class="backend-badge {_badge_class}">{_badge_label}</span></p>',
+    unsafe_allow_html=True,
+)
+st.markdown(
+    '<p class="phdata-subtitle">Ask questions about your data in plain English. '
+    'The agent discovers the schema on connect — no prior knowledge required.</p>',
+    unsafe_allow_html=True,
+)
 
 # ---------------------------------------------------------------------------
 # Sidebar — connection settings
 # ---------------------------------------------------------------------------
 with st.sidebar:
+    if _is_agentcore:
+        st.info(f"Backend: **AgentCore Runtime**\n\n`{_agentcore_url}`")
+    else:
+        st.caption("Backend: **Local Strands Agent** (direct Bedrock)")
     st.header("Database Connection")
     host = st.text_input("Host", value=os.environ.get("DB_HOST", ""))
     port = st.number_input("Port", value=int(os.environ.get("DB_PORT", "5432")), step=1)
@@ -96,6 +208,8 @@ with st.sidebar:
     user = st.text_input("User", value=os.environ.get("DB_USER", ""))
     password = st.text_input("Password", type="password",
                              value=os.environ.get("DB_PASSWORD", ""))
+    # Drivers available on main: postgresql, redshift
+    # Snowflake driver is on snow-iceberg-migration branch
     driver_type = st.selectbox("Database Type", ["postgresql", "redshift"],
         index=0)
     aws_profile = st.text_input("AWS Profile", value=os.environ.get(
@@ -184,6 +298,29 @@ for msg in st.session_state.messages:
             st.dataframe(msg["dataframe"], use_container_width=True)
         if "chart_data" in msg:
             _render_chart(msg["chart_data"])
+
+# ---------------------------------------------------------------------------
+# Empty state — shown before connection
+# ---------------------------------------------------------------------------
+if not st.session_state.connected and not st.session_state.messages:
+    st.markdown(f"""
+<div style="text-align: center; padding: 4rem 2rem;">
+    <h3 style="color: {TEXT_PRIMARY}; font-family: Inter, system-ui, sans-serif;">
+        Connect to get started
+    </h3>
+    <p style="color: {TEXT_SECONDARY}; max-width: 480px; margin: 0 auto;
+              font-family: Inter, system-ui, sans-serif;">
+        Enter your database credentials in the sidebar and click
+        <strong style="color: {TEXT_PRIMARY};">Connect &amp; Discover Schema</strong>.
+        The agent will scan your tables, columns, and relationships,
+        then you can ask questions in plain English.
+    </p>
+    <p style="color: #64748B; font-size: 0.85rem; margin-top: 1.5rem;
+              font-family: Inter, system-ui, sans-serif;">
+        Supports PostgreSQL and Redshift. Read-only — your data is never modified.
+    </p>
+</div>
+""", unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------------
 # Chat input

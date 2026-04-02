@@ -20,6 +20,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY patterns/platform-agent/ .
 COPY patterns/utils/ utils/
 
+# Copy full agent source as a package for direct tool access
+COPY src/platform_agent/ platform_agent/
+
 # OpenTelemetry configuration
 ENV AGENT_OBSERVABILITY_ENABLED=true
 ENV OTEL_PYTHON_DISTRO=aws_distro

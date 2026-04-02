@@ -136,8 +136,9 @@ resource "aws_amplify_app" "frontend" {
   tags = var.tags
 
   # Auto-build disabled — we deploy via script
+  # SPA fallback: serve static files if they exist, otherwise index.html
   custom_rule {
-    source = "/<*>"
+    source = "</^[^.]+$|\\.(?!(css|gif|ico|jpg|js|png|txt|svg|woff|woff2|ttf|map|json|webp)$)([^.]+$)/>"
     target = "/index.html"
     status = "200"
   }

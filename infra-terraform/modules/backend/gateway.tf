@@ -134,18 +134,20 @@ resource "aws_bedrockagentcore_gateway" "main" {
   role_arn       = aws_iam_role.gateway.arn
 
   protocol_configuration {
-    mcp {}
+    mcp {
+      supported_versions = ["2025-03-26"]
+      instructions       = "MCP Gateway for Platform Agent data tools"
+    }
   }
 
   authorizer_configuration {
     custom_jwt_authorizer {
-      discovery_url    = var.oidc_discovery_url
-      allowed_audience = []
-      allowed_clients  = []
+      discovery_url   = var.oidc_discovery_url
+      allowed_clients = [aws_cognito_user_pool_client.machine.id]
     }
   }
 
-  depends_on = [time_sleep.gateway_iam]
+  depends_on = [time_sleep.gateway_iam, aws_cognito_user_pool_client.machine]
 
   tags = var.tags
 }

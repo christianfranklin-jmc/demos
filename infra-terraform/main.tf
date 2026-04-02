@@ -40,6 +40,7 @@ module "backend" {
   # Cognito integration
   user_pool_id       = module.cognito.user_pool_id
   oidc_discovery_url = module.cognito.oidc_discovery_url
+  web_client_id      = module.cognito.web_client_id
 
   # VPC settings (conditional)
   vpc_id                 = var.backend_vpc_id

@@ -1,0 +1,12 @@
+{
+  "authority": "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_iQ70gh7t7",
+  "client_id": "18nqacih7h0drtth8ghobmlsac",
+  "redirect_uri": "https://main.d2fj6tk58y0pxw.amplifyapp.com/auth/callback",
+  "post_logout_redirect_uri": "https://main.d2fj6tk58y0pxw.amplifyapp.com",
+  "response_type": "code",
+  "scope": "email openid profile",
+  "automaticSilentRenew": true,
+  "agentRuntimeArn": "arn:aws:bedrock-agentcore:us-east-1:637119802057:runtime/platform_agent_runtime-OfViSJB74e",
+  "awsRegion": "us-east-1",
+  "agentPattern": "strands-single-agent"
+}

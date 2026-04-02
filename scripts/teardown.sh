@@ -9,7 +9,12 @@
 # Usage:
 #   ./scripts/teardown.sh --profile <AWS_PROFILE> [--services <LIST>] [--region <REGION>]
 #
-# Services (comma-separated): rds, redshift, all (default: all)
+# Services (comma-separated): rds, redshift, terraform, all (default: all)
+#
+# Examples:
+#   ./scripts/teardown.sh --profile <PROFILE> --services rds        # RDS only
+#   ./scripts/teardown.sh --profile <PROFILE> --services terraform  # AgentCore only
+#   ./scripts/teardown.sh --profile <PROFILE> --services all        # Everything
 
 set -euo pipefail
 
@@ -38,14 +43,16 @@ fi
 # Parse services into flags
 DO_RDS=false
 DO_REDSHIFT=false
+DO_TERRAFORM=false
 
 IFS=',' read -ra SVC_ARRAY <<< "$SERVICES"
 for svc in "${SVC_ARRAY[@]}"; do
     case "$(echo "$svc" | tr '[:upper:]' '[:lower:]' | xargs)" in
-        rds)      DO_RDS=true ;;
-        redshift) DO_REDSHIFT=true ;;
-        all)      DO_RDS=true; DO_REDSHIFT=true ;;
-        *) echo "Unknown service: $svc"; exit 1 ;;
+        rds)       DO_RDS=true ;;
+        redshift)  DO_REDSHIFT=true ;;
+        terraform) DO_TERRAFORM=true ;;
+        all)       DO_RDS=true; DO_REDSHIFT=true; DO_TERRAFORM=true ;;
+        *) echo "ERROR: Unknown service '$svc'. Valid: rds, redshift, terraform, all"; exit 1 ;;
     esac
 done
 
@@ -58,9 +65,11 @@ echo "Services: $SERVICES"
 # ---------------------------------------------------------------------------
 # Destroy Terraform infrastructure (AgentCore Gateway, Runtime, Memory, Cognito, Amplify)
 # ---------------------------------------------------------------------------
-echo "--- Terraform (infra-terraform/) ---"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TF_DIR="$SCRIPT_DIR/../infra-terraform"
+
+if [[ "$DO_TERRAFORM" == "true" ]]; then
+echo "--- Terraform (infra-terraform/) ---"
 if [[ -d "$TF_DIR/.terraform" ]]; then
     echo "Destroying Terraform-managed resources..."
     (cd "$TF_DIR" && terraform destroy -auto-approve 2>&1) || \
@@ -72,19 +81,19 @@ else
     echo "infra-terraform/ not found. Skipping Terraform teardown."
 fi
 
-# ---------------------------------------------------------------------------
-# Destroy AgentCore resources (legacy — agent runtime, ECR repo, gateway)
-# ---------------------------------------------------------------------------
 echo ""
 echo "--- AgentCore CLI (legacy) ---"
 if command -v agentcore &> /dev/null; then
     echo "Destroying AgentCore resources..."
     agentcore destroy --force --delete-ecr-repo 2>&1 || echo "AgentCore destroy completed (or no resources found)."
 else
-    echo "agentcore CLI not found. Skipping AgentCore teardown."
-    echo "  Install: uv pip install 'bedrock-agentcore[ag-ui]'"
-    echo "  Then run: agentcore destroy --force --delete-ecr-repo"
+    echo "agentcore CLI not found. Skipping."
 fi
+
+else
+    echo ""
+    echo "--- Skipping Terraform/AgentCore (not in --services) ---"
+fi  # DO_TERRAFORM
 
 # ---------------------------------------------------------------------------
 # Delete Redshift Serverless (workgroup then namespace)

@@ -28,7 +28,7 @@ resource "aws_iam_role_policy_attachment" "memory_bedrock" {
 # --- AgentCore Memory Resource ---
 
 resource "aws_bedrockagentcore_memory" "main" {
-  name                   = "${var.stack_name}-memory"
+  name                   = "${replace(var.stack_name, "-", "_")}_memory"
   description            = "Short-term memory for ${var.stack_name} agent"
   event_expiry_duration  = 30
   memory_execution_role_arn = aws_iam_role.memory.arn

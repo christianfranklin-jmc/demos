@@ -16,6 +16,10 @@ variable "network_mode" { type = string }
 variable "pattern" { type = string }
 variable "user_pool_id" { type = string }
 variable "oidc_discovery_url" { type = string }
+variable "web_client_id" {
+  description = "Cognito web client ID for JWT allowed_clients/allowed_audience"
+  type        = string
+}
 variable "vpc_id" {
   type    = string
   default = null

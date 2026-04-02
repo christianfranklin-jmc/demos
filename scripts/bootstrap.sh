@@ -24,13 +24,15 @@
 #   rds       — PostgreSQL on RDS (default)
 #   redshift  — Redshift Serverless
 #   snowflake — Snowflake config generation (no AWS provisioning)
+#   terraform — AgentCore infra (Terraform + Docker build + Amplify deploy)
 #   all       — All of the above
 #
 # Examples:
 #   ./scripts/bootstrap.sh --profile AdministratorAccess-637119802057
 #   ./scripts/bootstrap.sh --profile AdministratorAccess-637119802057 --services rds
 #   ./scripts/bootstrap.sh --profile AdministratorAccess-637119802057 --services rds,redshift
-#   ./scripts/bootstrap.sh --profile AdministratorAccess-637119802057 --services snowflake
+#   ./scripts/bootstrap.sh --profile AdministratorAccess-637119802057 --services terraform
+#   ./scripts/bootstrap.sh --profile AdministratorAccess-637119802057 --services rds,terraform
 #   ./scripts/bootstrap.sh --profile AdministratorAccess-637119802057 --services all
 
 set -euo pipefail
@@ -81,7 +83,7 @@ while [[ $# -gt 0 ]]; do
         -h|--help)
             echo "Usage: $0 --profile <AWS_PROFILE> [--services <LIST>] [--region <REGION>]"
             echo ""
-            echo "Services (comma-separated): rds, redshift, snowflake, all"
+            echo "Services (comma-separated): rds, redshift, snowflake, terraform, all"
             echo "Default: rds"
             echo ""
             echo "Snowflake flags (used with --services snowflake):"
@@ -100,6 +102,7 @@ fi
 DO_RDS=false
 DO_REDSHIFT=false
 DO_SNOWFLAKE=false
+DO_TERRAFORM=false
 
 IFS=',' read -ra SVC_ARRAY <<< "$SERVICES"
 for svc in "${SVC_ARRAY[@]}"; do
@@ -107,8 +110,9 @@ for svc in "${SVC_ARRAY[@]}"; do
         rds)       DO_RDS=true ;;
         redshift)  DO_REDSHIFT=true ;;
         snowflake) DO_SNOWFLAKE=true ;;
-        all)       DO_RDS=true; DO_REDSHIFT=true; DO_SNOWFLAKE=true ;;
-        *) echo "ERROR: Unknown service '$svc'. Valid: rds, redshift, snowflake, all"; exit 1 ;;
+        terraform) DO_TERRAFORM=true ;;
+        all)       DO_RDS=true; DO_REDSHIFT=true; DO_SNOWFLAKE=true; DO_TERRAFORM=true ;;
+        *) echo "ERROR: Unknown service '$svc'. Valid: rds, redshift, snowflake, terraform, all"; exit 1 ;;
     esac
 done
 
@@ -489,11 +493,36 @@ if count >= 10:
     print(f'Redshift already has {count} tables — skipping seed.')
 else:
     print('Loading seed data into Redshift...')
+    import re
     with open('scripts/seed_northwinds.sql', 'r') as f:
         sql = f.read()
-    cur.execute(sql)
+    # Adapt PostgreSQL types for Redshift compatibility
+    sql = sql.replace(' bytea', ' VARCHAR(1)')    # bytea not supported
+    sql = re.sub(r\" text([,\n)])\", r' VARCHAR(MAX)\1', sql)  # text -> VARCHAR(MAX)
+    # Remove SET statements that Redshift doesn't support
+    sql = re.sub(r'SET\s+statement_timeout\s*=.*?;', '', sql)
+    sql = re.sub(r'SET\s+lock_timeout\s*=.*?;', '', sql)
+    sql = re.sub(r'SET\s+client_encoding\s*=.*?;', '', sql)
+    sql = re.sub(r'SET\s+standard_conforming_strings\s*=.*?;', '', sql)
+    sql = re.sub(r'SET\s+check_function_bodies\s*=.*?;', '', sql)
+    sql = re.sub(r'SET\s+client_min_messages\s*=.*?;', '', sql)
+    sql = re.sub(r'SET\s+default_tablespace\s*=.*?;', '', sql)
+    sql = re.sub(r'SET\s+default_with_oids\s*=.*?;', '', sql)
+    # Remove bytea INSERT values (binary data can't load into VARCHAR)
+    sql = re.sub(r\"'\\\\\\\\x[0-9a-fA-F]+'\", \"''\", sql)
+    # Execute statement by statement to skip errors on individual statements
+    statements = [s.strip() for s in sql.split(';') if s.strip()]
+    errors = 0
+    for stmt in statements:
+        try:
+            cur.execute(stmt)
+        except Exception as e:
+            errors += 1
+            if errors <= 3:
+                print(f'  Warning: {str(e)[:80]}')
     cur.execute(\"SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE'\")
-    print(f'Redshift seeded: {cur.fetchone()[0]} tables')
+    tbl_count = cur.fetchone()[0]
+    print(f'Redshift seeded: {tbl_count} tables ({errors} statements skipped)')
 cur.close(); conn.close()
 " 2>&1
     else
@@ -689,23 +718,137 @@ fi
 fi
 
 # ---------------------------------------------------------------------------
+# Step 12: Terraform + Docker + Amplify (when --services terraform)
+# ---------------------------------------------------------------------------
+if [[ "$DO_TERRAFORM" == "true" ]]; then
+echo ""
+echo "--- Step 12: Terraform Infrastructure ---"
+TF_DIR="$PROJECT_DIR/infra-terraform"
+cd "$TF_DIR"
+
+# Create terraform.tfvars if missing
+if [[ ! -f terraform.tfvars ]]; then
+    echo "Generating terraform.tfvars from .env..."
+    cat > terraform.tfvars << TFEOF
+stack_name_base = "platform-agent"
+admin_user_email = "${DB_USER}@example.com"
+backend_pattern = "platform-agent"
+backend_deployment_type = "docker"
+backend_network_mode = "PUBLIC"
+db_host = "${DB_ENDPOINT:-}"
+db_port = ${DB_PORT:-5432}
+db_name = "${DB_NAME}"
+db_user = "${DB_USER}"
+db_password = "${DB_PASSWORD}"
+db_driver_type = "postgresql"
+TFEOF
+    echo "Created terraform.tfvars (edit admin_user_email before applying)"
+fi
+
+# Init and apply
+terraform init
+terraform apply -auto-approve
+
+# Capture outputs
+RUNTIME_ARN=$(terraform output -raw runtime_arn 2>/dev/null || echo "")
+ECR_URL=$(terraform output -raw ecr_repository_url 2>/dev/null || echo "")
+COGNITO_POOL_ID=$(terraform output -raw cognito_user_pool_id 2>/dev/null || echo "")
+COGNITO_CLIENT_ID=$(terraform output -raw cognito_web_client_id 2>/dev/null || echo "")
+COGNITO_DOMAIN=$(terraform output -raw cognito_domain_url 2>/dev/null || echo "")
+AMPLIFY_URL=$(terraform output -raw amplify_app_url 2>/dev/null || echo "")
+cd "$PROJECT_DIR"
+
+# Docker build + push (if Docker is available)
+if command -v docker &> /dev/null && docker info > /dev/null 2>&1; then
+    echo ""
+    echo "--- Building and pushing agent container ---"
+    ECR_HOST=$(echo "$ECR_URL" | cut -d/ -f1)
+    $AWS ecr get-login-password --region "$REGION" | \
+        docker login --username AWS --password-stdin "$ECR_HOST" 2>/dev/null
+    docker build --platform linux/arm64 -t platform-agent \
+        -f patterns/platform-agent/Dockerfile . 2>&1 | tail -3
+    docker tag platform-agent:latest "${ECR_URL}:latest"
+    docker push "${ECR_URL}:latest" 2>&1 | tail -3
+
+    # Re-apply to pick up the image
+    cd "$TF_DIR" && terraform apply -auto-approve 2>&1 | tail -5
+    cd "$PROJECT_DIR"
+    echo "Agent container deployed."
+else
+    echo "WARNING: Docker not running. Skipping container build."
+    echo "  Start Docker Desktop, then run:"
+    echo "  docker build --platform linux/arm64 -t platform-agent -f patterns/platform-agent/Dockerfile ."
+    echo "  docker tag platform-agent:latest ${ECR_URL}:latest"
+    echo "  docker push ${ECR_URL}:latest"
+fi
+
+# Deploy React frontend to Amplify
+if command -v npm &> /dev/null && [[ -n "$AMPLIFY_URL" ]]; then
+    echo ""
+    echo "--- Deploying React frontend to Amplify ---"
+    cd "$PROJECT_DIR/frontend"
+
+    cat > .env.production << FEEOF
+VITE_AGENTCORE_RUNTIME_ARN=${RUNTIME_ARN}
+VITE_AGENTCORE_REGION=${REGION}
+VITE_AGENTCORE_PATTERN=strands-single-agent
+VITE_COGNITO_POOL_ID=${COGNITO_POOL_ID}
+VITE_COGNITO_CLIENT_ID=${COGNITO_CLIENT_ID}
+VITE_COGNITO_DOMAIN=${COGNITO_DOMAIN}
+VITE_COGNITO_REDIRECT_URI=${AMPLIFY_URL}/auth/callback
+FEEOF
+
+    npm install --silent 2>/dev/null
+    npm run build 2>&1 | tail -5
+    cp public/aws-exports.json dist/ 2>/dev/null || true
+
+    cd dist
+    zip -qr /tmp/amplify-deploy.zip .
+    BUCKET=$($AWS s3 ls | grep platform-agent-staging | awk '{print $3}' | head -1)
+    $AWS s3 cp /tmp/amplify-deploy.zip "s3://$BUCKET/deploy.zip" --no-progress
+    APP_ID=$($AWS amplify list-apps \
+        --query 'apps[?contains(name,`platform-agent`)].appId' --output text)
+    $AWS amplify start-deployment \
+        --app-id "$APP_ID" --branch-name main \
+        --source-url "s3://$BUCKET/deploy.zip" > /dev/null
+    rm -f /tmp/amplify-deploy.zip
+    cd "$PROJECT_DIR"
+    echo "Frontend deployed to: $AMPLIFY_URL"
+else
+    echo "WARNING: npm not found or Amplify not configured. Skipping frontend deploy."
+fi
+
+else
+    echo ""
+    echo "--- Skipping Terraform/AgentCore (not in --services) ---"
+fi  # DO_TERRAFORM
+
+# ---------------------------------------------------------------------------
 # Done
 # ---------------------------------------------------------------------------
 echo ""
 echo "=== Bootstrap complete ==="
 echo ""
 echo "Services provisioned: $SERVICES"
-if [[ "$DO_RDS" == "true" && -n "$DB_ENDPOINT" ]]; then
+if [[ "$DO_RDS" == "true" && -n "${DB_ENDPOINT:-}" ]]; then
     echo "PostgreSQL (RDS):  $DB_ENDPOINT:$DB_PORT"
 fi
 if [[ "$DO_REDSHIFT" == "true" ]]; then
     echo "Redshift:          ${RS_ENDPOINT:-PENDING}:${RS_PORT:-5439}"
 fi
-if [[ "$DO_SNOWFLAKE" == "true" && -n "$SF_ACCOUNT" ]]; then
+if [[ "$DO_SNOWFLAKE" == "true" && -n "${SF_ACCOUNT:-}" ]]; then
     echo "Snowflake:         $SF_ACCOUNT ($SF_DATABASE.$SF_SCHEMA)"
+fi
+if [[ "$DO_TERRAFORM" == "true" ]]; then
+    echo "AgentCore Runtime: ${RUNTIME_ARN:-NOT DEPLOYED}"
+    echo "React Frontend:    ${AMPLIFY_URL:-NOT DEPLOYED}"
 fi
 echo "Config files:      .env"
 echo ""
 echo "Next steps:"
 echo "  source .env"
-echo "  uv run streamlit run streamlit_app/app.py --server.port 8501"
+if [[ "$DO_TERRAFORM" == "true" ]]; then
+    echo "  Open: ${AMPLIFY_URL:-https://your-amplify-url}"
+else
+    echo "  uv run streamlit run streamlit_app/app.py --server.port 8501"
+fi

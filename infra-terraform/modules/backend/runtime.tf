@@ -81,8 +81,9 @@ resource "aws_iam_role_policy" "runtime" {
           "bedrock:InvokeModelWithResponseStream",
         ]
         Resource = [
-          "arn:aws:bedrock:${var.region}::foundation-model/us.anthropic.claude-sonnet-4*",
-          "arn:aws:bedrock:${var.region}::foundation-model/us.anthropic.claude-opus-4*",
+          "arn:aws:bedrock:*::foundation-model/anthropic.claude-*",
+          "arn:aws:bedrock:*::foundation-model/us.anthropic.claude-*",
+          "arn:aws:bedrock:${var.region}:${var.account_id}:inference-profile/us.anthropic.claude-*",
         ]
       },
       {
@@ -138,7 +139,7 @@ resource "aws_iam_role_policy" "runtime" {
 # --- AgentCore Runtime ---
 
 resource "aws_bedrockagentcore_agent_runtime" "main" {
-  agent_runtime_name = "${var.stack_name}-runtime"
+  agent_runtime_name = "${replace(var.stack_name, "-", "_")}_runtime"
   description        = "Platform Agent runtime for ${var.stack_name}"
   role_arn           = aws_iam_role.runtime.arn
 
@@ -148,15 +149,26 @@ resource "aws_bedrockagentcore_agent_runtime" "main" {
     }
   }
 
+  environment_variables = {
+    DB_HOST         = var.db_host
+    DB_PORT         = tostring(var.db_port)
+    DB_NAME         = var.db_name
+    DB_USER         = var.db_user
+    DB_PASSWORD     = var.db_password
+    DB_DRIVER_TYPE  = var.db_driver_type
+    MEMORY_ID       = aws_bedrockagentcore_memory.main.id
+    STACK_NAME      = var.stack_name
+    AWS_REGION      = var.region
+  }
+
   network_configuration {
     network_mode = var.network_mode
   }
 
   authorizer_configuration {
     custom_jwt_authorizer {
-      discovery_url    = var.oidc_discovery_url
-      allowed_audience = []
-      allowed_clients  = []
+      discovery_url   = var.oidc_discovery_url
+      allowed_clients = [var.web_client_id]
     }
   }
 

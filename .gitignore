@@ -48,10 +48,15 @@ frontend/dist/
 
 # phData Toolkit
 toolkit.conf
-lib/
+/lib/
 logs/
-/tools/
+/tools/ds/
 .toolkit-metadata
+
+# Keep these tracked despite lib/ and tools/ patterns
+!frontend/src/lib/
+!tools/code_interpreter/
+!tools/__init__.py
 
 # dbt user config
 dbt_output/*/.user.yml
