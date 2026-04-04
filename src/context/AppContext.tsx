@@ -42,6 +42,11 @@ type AppAction =
   | { type: "SET_CONCEPTUAL_MODEL"; model: ConceptualModelArtifact }
   | { type: "SET_LOGICAL_MODEL"; model: LogicalModelArtifact }
   | { type: "SET_DETAILED_REQUIREMENTS"; model: DetailedRequirementsArtifact }
+  // Granular artifact updates
+  | { type: "UPDATE_ENTITY"; entityId: string; updates: Partial<import("../lib/types").ConceptualEntity> }
+  | { type: "UPDATE_RELATIONSHIP"; index: number; updates: Partial<import("../lib/types").EntityRelationship> }
+  | { type: "UPDATE_LOGICAL_ATTRIBUTE"; entityName: string; attrIndex: number; updates: Partial<import("../lib/types").LogicalAttribute> }
+  | { type: "UPDATE_DETAILED_FIELD"; tableName: string; fieldIndex: number; updates: Partial<import("../lib/types").DetailedField> }
   | { type: "ADD_FLAG"; flag: QualityFlag }
   | { type: "RESOLVE_FLAG"; flagId: string; resolution: string; resolvedBy: string }
   | { type: "SET_AGENT_THINKING"; thinking: boolean }
@@ -132,6 +137,97 @@ function appReducer(state: AppState, action: AppAction): AppState {
 
     case "SET_DETAILED_REQUIREMENTS":
       return { ...state, artifacts: { ...state.artifacts, detailed: action.model } };
+
+    case "UPDATE_ENTITY": {
+      if (!state.artifacts.conceptual) return state;
+      return {
+        ...state,
+        artifacts: {
+          ...state.artifacts,
+          conceptual: {
+            ...state.artifacts.conceptual,
+            entities: state.artifacts.conceptual.entities.map((e) =>
+              e.entity_id === action.entityId ? { ...e, ...action.updates } : e
+            ),
+          },
+        },
+      };
+    }
+
+    case "UPDATE_RELATIONSHIP": {
+      if (!state.artifacts.conceptual) return state;
+      return {
+        ...state,
+        artifacts: {
+          ...state.artifacts,
+          conceptual: {
+            ...state.artifacts.conceptual,
+            relationships: state.artifacts.conceptual.relationships.map((r, i) =>
+              i === action.index ? { ...r, ...action.updates } : r
+            ),
+          },
+        },
+      };
+    }
+
+    case "UPDATE_LOGICAL_ATTRIBUTE": {
+      if (!state.artifacts.logical) return state;
+      return {
+        ...state,
+        artifacts: {
+          ...state.artifacts,
+          logical: {
+            ...state.artifacts.logical,
+            entities: state.artifacts.logical.entities.map((e) =>
+              e.entity_name === action.entityName
+                ? {
+                    ...e,
+                    attributes: e.attributes.map((a, i) =>
+                      i === action.attrIndex ? { ...a, ...action.updates } : a
+                    ),
+                  }
+                : e
+            ),
+          },
+        },
+      };
+    }
+
+    case "UPDATE_DETAILED_FIELD": {
+      if (!state.artifacts.detailed) return state;
+      const updateFields = (fields: any[]) =>
+        fields.map((f: any, i: number) => (i === action.fieldIndex ? { ...f, ...action.updates } : f));
+
+      if (state.artifacts.detailed.fact_table?.table_name === action.tableName) {
+        return {
+          ...state,
+          artifacts: {
+            ...state.artifacts,
+            detailed: {
+              ...state.artifacts.detailed,
+              fact_table: {
+                ...state.artifacts.detailed.fact_table,
+                fields: updateFields(state.artifacts.detailed.fact_table.fields),
+              },
+            },
+          },
+        };
+      }
+      return {
+        ...state,
+        artifacts: {
+          ...state.artifacts,
+          detailed: {
+            ...state.artifacts.detailed,
+            dimension_tables: (state.artifacts.detailed.dimension_tables || []).map((dt) =>
+              dt.table_name === action.tableName
+                ? { ...dt, fields: updateFields(dt.fields) }
+                : dt
+            ),
+          },
+        },
+      };
+    }
 
     case "ADD_FLAG":
       return {

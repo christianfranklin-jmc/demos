@@ -140,7 +140,12 @@ export const STANDARDS: Standard[] = [
     rule: "Entity names must follow snake_case naming convention",
     description: "Consistent naming prevents join errors and aligns with Snowflake conventions. Use dim_ prefix for dimensions, fact_ for facts.",
     severity: "warning",
+    fieldKey: "entity_name",
     flagType: "standards_general",
+    validate: (v: any) => {
+      if (!v || typeof v !== "string") return true;
+      return /^[a-z][a-z0-9_]*$/.test(v);
+    },
   },
   {
     id: "s2-03",
@@ -151,6 +156,17 @@ export const STANDARDS: Standard[] = [
     severity: "warning",
     flagType: "standards_general",
   },
+  {
+    id: "s2-04",
+    step: 2,
+    category: "Entity Design",
+    rule: "Entity descriptions should be at least 10 characters",
+    description: "Very short descriptions don't help the team understand the entity's purpose in the model.",
+    severity: "info",
+    fieldKey: "entity_description",
+    flagType: "standards_general",
+    validate: (v: any) => !v || typeof v !== "string" || v.length >= 10,
+  },
 
   // ─── Step 3: Logical Model Standards ───
   {
@@ -160,7 +176,12 @@ export const STANDARDS: Standard[] = [
     rule: "Every field must have an explicit data type",
     description: "Implicit data types cause casting errors and performance issues in the warehouse.",
     severity: "error",
+    fieldKey: "data_type",
     flagType: "standards_general",
+    validate: (v: any) => {
+      if (!v || typeof v !== "string") return true;
+      return v.length >= 2 && v !== "\u2014";
+    },
   },
   {
     id: "s3-02",
@@ -169,7 +190,23 @@ export const STANDARDS: Standard[] = [
     rule: "Source field must be documented for every non-derived field",
     description: "Fields without source mappings cannot be implemented. Even 'TBD' is better than blank.",
     severity: "warning",
+    fieldKey: "source_field",
     flagType: "standards_general",
+    validate: (v: any) => !v || (typeof v === "string" && v.length >= 1),
+  },
+  {
+    id: "s3-04",
+    step: 3,
+    category: "Field Design",
+    rule: "Target field names must follow snake_case convention",
+    description: "Consistent naming aligns with Snowflake conventions and prevents downstream errors.",
+    severity: "warning",
+    fieldKey: "target_field",
+    flagType: "standards_general",
+    validate: (v: any) => {
+      if (!v || typeof v !== "string") return true;
+      return /^[a-z][a-z0-9_]*$/.test(v);
+    },
   },
   {
     id: "s3-03",
@@ -189,7 +226,12 @@ export const STANDARDS: Standard[] = [
     rule: "Every field must have a governance level assigned",
     description: "Governance levels (Public, Restricted, Masked, Excluded) determine who can see what. Missing governance = security risk.",
     severity: "error",
+    fieldKey: "governance",
     flagType: "standards_no_governance",
+    validate: (v: any) => {
+      if (!v || typeof v !== "string") return true;
+      return ["Public", "Restricted", "Masked", "Excluded"].includes(v);
+    },
   },
   {
     id: "s4-02",
@@ -198,7 +240,12 @@ export const STANDARDS: Standard[] = [
     rule: "Every field must be assigned to a phase (MVP, Phase 2, Out of scope)",
     description: "Unphased fields create scope creep. Explicitly mark everything as in or out.",
     severity: "warning",
+    fieldKey: "phase",
     flagType: "standards_general",
+    validate: (v: any) => {
+      if (!v || typeof v !== "string") return true;
+      return ["MVP", "Phase 2", "Out of scope"].includes(v);
+    },
   },
   {
     id: "s4-03",
@@ -217,6 +264,31 @@ export const STANDARDS: Standard[] = [
     description: "Approving with less than 60% field mapping coverage means significant gaps remain.",
     severity: "warning",
     flagType: "standards_general",
+  },
+  {
+    id: "s4-05",
+    step: 4,
+    category: "Field Design",
+    rule: "Target field names must follow snake_case convention",
+    description: "Consistent naming aligns with Snowflake conventions.",
+    severity: "warning",
+    fieldKey: "target_field",
+    flagType: "standards_general",
+    validate: (v: any) => {
+      if (!v || typeof v !== "string") return true;
+      return /^[a-z][a-z0-9_]*$/.test(v);
+    },
+  },
+  {
+    id: "s4-06",
+    step: 4,
+    category: "Governance",
+    rule: "Spend-related fields should be Restricted, not Public",
+    description: "Financial data like spend, budget, and cost should have restricted access to protect sensitive information.",
+    severity: "warning",
+    fieldKey: "governance",
+    flagType: "standards_no_governance",
+    validate: (_v: any) => true, // context-checked in component
   },
 ];
 

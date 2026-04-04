@@ -1,63 +1,41 @@
+import { useCallback } from "react";
 import { useAppState } from "../../context/AppContext";
 import { useTheme } from "../../context/ThemeContext";
+import { validateField, hasExistingFlag } from "../../lib/validation";
 import FlagBadge from "./FlagBadge";
+import EditableCell from "./EditableCell";
+import FlagsList from "./FlagsList";
 import EmptyState from "../shared/EmptyState";
+import type { StepNumber } from "../../lib/types";
 
 interface LogicalModelProps {
   activeTab: string;
 }
 
 export default function LogicalModel({ activeTab }: LogicalModelProps) {
-  const { state } = useAppState();
+  const { state, dispatch } = useAppState();
   const { theme } = useTheme();
   const model = state.artifacts.logical;
+
+  const handleValidate = useCallback(
+    (fieldKey: string, value: any) => {
+      if (!theme.features.enableStandardsValidation) return;
+      const violations = validateField(3 as StepNumber, fieldKey, value, state.lifecycle.data_product_id);
+      for (const v of violations) {
+        if (!hasExistingFlag(state.flags, 3, v.flag_type)) {
+          dispatch({ type: "ADD_FLAG", flag: v });
+        }
+      }
+    },
+    [dispatch, state.lifecycle.data_product_id, state.flags, theme.features.enableStandardsValidation]
+  );
 
   if (!model || model.entities.length === 0) {
     return <EmptyState stepNumber={3} tabName={activeTab === "Flags" ? "Flags" : "Logical Model"} />;
   }
 
   if (activeTab === "Flags") {
-    const flags = model.flags || [];
-    if (flags.length === 0) {
-      return <EmptyState stepNumber={3} tabName="Flags" />;
-    }
-    return (
-      <div className="flex-1 overflow-y-auto px-4 py-4">
-        <h3
-          className="text-xs font-semibold uppercase tracking-wider mb-3"
-          style={{ color: theme.colors.textSecondary }}
-        >
-          Quality Flags ({flags.filter((f) => f.status === "open").length} open)
-        </h3>
-        <div className="flex flex-col gap-2">
-          {flags.map((flag) => (
-            <div
-              key={flag.flag_id}
-              className="px-3 py-3 rounded-lg border"
-              style={{
-                borderColor: theme.colors.borderSubtle,
-                backgroundColor: flag.status === "open" ? theme.colors.white : theme.colors.surfaceSubtle,
-              }}
-            >
-              <div className="flex items-center gap-2 mb-1">
-                <FlagBadge type={flag.flag_type} status={flag.status} />
-                <span className="text-xs" style={{ color: theme.colors.textTertiary }}>
-                  Step {flag.step}
-                </span>
-              </div>
-              <p className="text-sm" style={{ color: theme.colors.textPrimary }}>
-                {flag.description}
-              </p>
-              {flag.resolution && (
-                <p className="text-xs mt-1 italic" style={{ color: theme.colors.textTertiary }}>
-                  Resolution: {flag.resolution}
-                </p>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-    );
+    return <FlagsList />;
   }
 
   return (
@@ -98,19 +76,65 @@ export default function LogicalModel({ activeTab }: LogicalModelProps) {
                 {entity.attributes.map((attr, i) => (
                   <tr
                     key={i}
+                    className="group"
                     style={{ borderBottom: `1px solid ${theme.colors.borderSubtle}` }}
                   >
-                    <td className="px-3 py-2 font-mono text-xs" style={{ color: theme.colors.textPrimary }}>
-                      {attr.target_field}
+                    <td className="px-3 py-2 text-xs">
+                      <EditableCell
+                        value={attr.target_field}
+                        mono
+                        onSave={(v) =>
+                          dispatch({
+                            type: "UPDATE_LOGICAL_ATTRIBUTE",
+                            entityName: entity.entity_name,
+                            attrIndex: i,
+                            updates: { target_field: v },
+                          })
+                        }
+                        onValidate={(v) => handleValidate("target_field", v)}
+                      />
                     </td>
-                    <td className="px-3 py-2 text-xs" style={{ color: theme.colors.textSecondary }}>
-                      {attr.data_type}
+                    <td className="px-3 py-2 text-xs">
+                      <EditableCell
+                        value={attr.data_type}
+                        onSave={(v) =>
+                          dispatch({
+                            type: "UPDATE_LOGICAL_ATTRIBUTE",
+                            entityName: entity.entity_name,
+                            attrIndex: i,
+                            updates: { data_type: v },
+                          })
+                        }
+                        onValidate={(v) => handleValidate("data_type", v)}
+                      />
                     </td>
-                    <td className="px-3 py-2 font-mono text-xs" style={{ color: theme.colors.textTertiary }}>
-                      {attr.source_field || "—"}
+                    <td className="px-3 py-2 text-xs">
+                      <EditableCell
+                        value={attr.source_field || ""}
+                        mono
+                        onSave={(v) =>
+                          dispatch({
+                            type: "UPDATE_LOGICAL_ATTRIBUTE",
+                            entityName: entity.entity_name,
+                            attrIndex: i,
+                            updates: { source_field: v || null },
+                          })
+                        }
+                        onValidate={(v) => handleValidate("source_field", v)}
+                      />
                     </td>
-                    <td className="px-3 py-2 text-xs" style={{ color: theme.colors.textSecondary }}>
-                      {attr.transformation_rule || "—"}
+                    <td className="px-3 py-2 text-xs">
+                      <EditableCell
+                        value={attr.transformation_rule || ""}
+                        onSave={(v) =>
+                          dispatch({
+                            type: "UPDATE_LOGICAL_ATTRIBUTE",
+                            entityName: entity.entity_name,
+                            attrIndex: i,
+                            updates: { transformation_rule: v || null },
+                          })
+                        }
+                      />
                     </td>
                     <td className="px-3 py-2">
                       {attr.flag ? <FlagBadge type={attr.flag} /> : null}

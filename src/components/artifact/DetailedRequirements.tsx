@@ -1,71 +1,18 @@
+import { useCallback } from "react";
 import { useAppState } from "../../context/AppContext";
 import { useTheme } from "../../context/ThemeContext";
+import { validateField, hasExistingFlag } from "../../lib/validation";
 import CompletenessBar from "./CompletenessBar";
+import EditableCell from "./EditableCell";
 import EmptyState from "../shared/EmptyState";
+import type { StepNumber, GovernanceLevel, PhaseLabel } from "../../lib/types";
 
 interface DetailedRequirementsProps {
   activeTab: string;
 }
 
-function FieldTable({ title, fields, theme }: { title: string; fields: any[]; theme: any }) {
-  if (!fields || fields.length === 0) return null;
-  return (
-    <div className="mb-6">
-      <h3 className="text-sm font-medium mb-2" style={{ color: theme.colors.textPrimary }}>
-        {title}
-      </h3>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm" style={{ borderCollapse: "collapse" }}>
-          <thead>
-            <tr style={{ borderBottom: `1px solid ${theme.colors.borderSubtle}` }}>
-              {["Target Field", "Source", "Source Field", "Transformation", "Required", "Governance", "Phase"].map(
-                (h) => (
-                  <th
-                    key={h}
-                    className="text-left text-xs font-medium uppercase tracking-wider px-2 py-2"
-                    style={{ color: theme.colors.textSecondary }}
-                  >
-                    {h}
-                  </th>
-                )
-              )}
-            </tr>
-          </thead>
-          <tbody>
-            {fields.map((field: any, i: number) => (
-              <tr
-                key={i}
-                style={{ borderBottom: `1px solid ${theme.colors.borderSubtle}` }}
-              >
-                <td className="px-2 py-2 font-mono text-xs" style={{ color: theme.colors.textPrimary }}>
-                  {field.target_field}
-                </td>
-                <td className="px-2 py-2 text-xs" style={{ color: theme.colors.textSecondary }}>
-                  {field.source_system}
-                </td>
-                <td className="px-2 py-2 font-mono text-xs" style={{ color: theme.colors.textTertiary }}>
-                  {field.source_field}
-                </td>
-                <td className="px-2 py-2 text-xs max-w-48 truncate" style={{ color: theme.colors.textSecondary }}>
-                  {field.transformation || "Direct map"}
-                </td>
-                <td className="px-2 py-2 text-xs" style={{ color: theme.colors.textPrimary }}>
-                  {field.required ? "Y" : "N"}
-                </td>
-                <td className="px-2 py-2">
-                  <GovernanceBadge level={field.governance} theme={theme} />
-                </td>
-                <td className="px-2 py-2">
-                  <PhaseBadge phase={field.phase} theme={theme} />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
+const GOVERNANCE_OPTIONS: GovernanceLevel[] = ["Public", "Restricted", "Masked", "Excluded"];
+const PHASE_OPTIONS: PhaseLabel[] = ["MVP", "Phase 2", "Out of scope"];
 
 function GovernanceBadge({ level, theme }: { level: string; theme: any }) {
   const colors: Record<string, string> = {
@@ -104,10 +51,177 @@ function PhaseBadge({ phase, theme }: { phase: string; theme: any }) {
   );
 }
 
+function FieldTable({
+  title,
+  tableName,
+  fields,
+  theme,
+  dispatch,
+  onValidate,
+}: {
+  title: string;
+  tableName: string;
+  fields: any[];
+  theme: any;
+  dispatch: any;
+  onValidate: (fieldKey: string, value: any) => void;
+}) {
+  if (!fields || fields.length === 0) return null;
+  return (
+    <div className="mb-6">
+      <h3 className="text-sm font-medium mb-2" style={{ color: theme.colors.textPrimary }}>
+        {title}
+      </h3>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm" style={{ borderCollapse: "collapse" }}>
+          <thead>
+            <tr style={{ borderBottom: `1px solid ${theme.colors.borderSubtle}` }}>
+              {["Target Field", "Source", "Source Field", "Transformation", "Req", "Governance", "Phase"].map(
+                (h) => (
+                  <th
+                    key={h}
+                    className="text-left text-xs font-medium uppercase tracking-wider px-2 py-2"
+                    style={{ color: theme.colors.textSecondary }}
+                  >
+                    {h}
+                  </th>
+                )
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {fields.map((field: any, i: number) => (
+              <tr
+                key={i}
+                style={{ borderBottom: `1px solid ${theme.colors.borderSubtle}` }}
+              >
+                <td className="px-2 py-2 text-xs">
+                  <EditableCell
+                    value={field.target_field}
+                    mono
+                    onSave={(v) =>
+                      dispatch({
+                        type: "UPDATE_DETAILED_FIELD",
+                        tableName,
+                        fieldIndex: i,
+                        updates: { target_field: v },
+                      })
+                    }
+                    onValidate={(v) => onValidate("target_field", v)}
+                  />
+                </td>
+                <td className="px-2 py-2 text-xs">
+                  <EditableCell
+                    value={field.source_system}
+                    onSave={(v) =>
+                      dispatch({
+                        type: "UPDATE_DETAILED_FIELD",
+                        tableName,
+                        fieldIndex: i,
+                        updates: { source_system: v },
+                      })
+                    }
+                  />
+                </td>
+                <td className="px-2 py-2 text-xs">
+                  <EditableCell
+                    value={field.source_field}
+                    mono
+                    onSave={(v) =>
+                      dispatch({
+                        type: "UPDATE_DETAILED_FIELD",
+                        tableName,
+                        fieldIndex: i,
+                        updates: { source_field: v },
+                      })
+                    }
+                  />
+                </td>
+                <td className="px-2 py-2 text-xs max-w-48">
+                  <EditableCell
+                    value={field.transformation || "Direct map"}
+                    onSave={(v) =>
+                      dispatch({
+                        type: "UPDATE_DETAILED_FIELD",
+                        tableName,
+                        fieldIndex: i,
+                        updates: { transformation: v },
+                      })
+                    }
+                  />
+                </td>
+                <td className="px-2 py-2 text-xs">
+                  <EditableCell
+                    value={field.required ? "Y" : "N"}
+                    type="select"
+                    options={["Y", "N"]}
+                    onSave={(v) =>
+                      dispatch({
+                        type: "UPDATE_DETAILED_FIELD",
+                        tableName,
+                        fieldIndex: i,
+                        updates: { required: v === "Y" },
+                      })
+                    }
+                  />
+                </td>
+                <td className="px-2 py-2">
+                  <EditableCell
+                    value={field.governance}
+                    type="select"
+                    options={GOVERNANCE_OPTIONS}
+                    onSave={(v) => {
+                      dispatch({
+                        type: "UPDATE_DETAILED_FIELD",
+                        tableName,
+                        fieldIndex: i,
+                        updates: { governance: v as GovernanceLevel },
+                      });
+                      onValidate("governance", v);
+                    }}
+                  />
+                </td>
+                <td className="px-2 py-2">
+                  <EditableCell
+                    value={field.phase}
+                    type="select"
+                    options={PHASE_OPTIONS}
+                    onSave={(v) =>
+                      dispatch({
+                        type: "UPDATE_DETAILED_FIELD",
+                        tableName,
+                        fieldIndex: i,
+                        updates: { phase: v as PhaseLabel },
+                      })
+                    }
+                  />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 export default function DetailedRequirements({ activeTab }: DetailedRequirementsProps) {
-  const { state } = useAppState();
+  const { state, dispatch } = useAppState();
   const { theme } = useTheme();
   const model = state.artifacts.detailed;
+
+  const handleValidate = useCallback(
+    (fieldKey: string, value: any) => {
+      if (!theme.features.enableStandardsValidation) return;
+      const violations = validateField(4 as StepNumber, fieldKey, value, state.lifecycle.data_product_id);
+      for (const v of violations) {
+        if (!hasExistingFlag(state.flags, 4, v.flag_type)) {
+          dispatch({ type: "ADD_FLAG", flag: v });
+        }
+      }
+    },
+    [dispatch, state.lifecycle.data_product_id, state.flags, theme.features.enableStandardsValidation]
+  );
 
   if (!model) {
     return <EmptyState stepNumber={4} tabName={activeTab === "Completeness" ? "Completeness" : "Detailed Requirements"} />;
@@ -141,8 +255,11 @@ export default function DetailedRequirements({ activeTab }: DetailedRequirements
       {model.fact_table && (
         <FieldTable
           title={`${model.fact_table.table_name} (grain: ${model.fact_table.grain})`}
+          tableName={model.fact_table.table_name}
           fields={model.fact_table.fields}
           theme={theme}
+          dispatch={dispatch}
+          onValidate={handleValidate}
         />
       )}
 
@@ -150,8 +267,11 @@ export default function DetailedRequirements({ activeTab }: DetailedRequirements
         <FieldTable
           key={dim.table_name}
           title={dim.table_name}
+          tableName={dim.table_name}
           fields={dim.fields}
           theme={theme}
+          dispatch={dispatch}
+          onValidate={handleValidate}
         />
       ))}
 
