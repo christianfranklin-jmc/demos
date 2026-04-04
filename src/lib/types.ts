@@ -87,7 +87,14 @@ export type FlagType =
   | "access_dependency"
   | "missing_source"
   | "derived_field"
-  | "naming_conflict";
+  | "naming_conflict"
+  // Standards violation flags
+  | "standards_vague_objective"
+  | "standards_missing_grain"
+  | "standards_weak_criteria"
+  | "standards_undefined_metric"
+  | "standards_no_governance"
+  | "standards_general";
 
 export type FlagStatus = "open" | "resolved" | "deferred";
 

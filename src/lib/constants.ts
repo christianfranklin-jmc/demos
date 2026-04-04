@@ -176,6 +176,13 @@ export const FLAG_CONFIG: Record<string, { color: string; label: string }> = {
   missing_source: { color: "#EF4444", label: "Missing Source" },
   derived_field: { color: "#3B82F6", label: "Derived Field" },
   naming_conflict: { color: "#9CA3AF", label: "Naming Conflict" },
+  // Standards violation flags (purple)
+  standards_vague_objective: { color: "#8B5CF6", label: "Vague Objective" },
+  standards_missing_grain: { color: "#8B5CF6", label: "Missing Grain Definition" },
+  standards_weak_criteria: { color: "#8B5CF6", label: "Weak Success Criteria" },
+  standards_undefined_metric: { color: "#8B5CF6", label: "Undefined Metric" },
+  standards_no_governance: { color: "#8B5CF6", label: "No Governance Level" },
+  standards_general: { color: "#8B5CF6", label: "Standards Violation" },
 };
 
 // ============================================================

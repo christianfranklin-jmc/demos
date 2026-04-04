@@ -6,15 +6,25 @@ import PRDView from "./PRDView";
 import ConceptualERD from "./ConceptualERD";
 import LogicalModel from "./LogicalModel";
 import DetailedRequirements from "./DetailedRequirements";
+import StandardsView from "./StandardsView";
+import FlagsList from "./FlagsList";
+import GraphView from "./GraphView";
 import EmptyState from "../shared/EmptyState";
 import GateApproval from "../gates/GateApproval";
 
-function getTabsForStep(step: number, enableFlags: boolean): string[] {
+function getTabsForStep(
+  step: number,
+  enableFlags: boolean,
+  enableStandards: boolean,
+  enableVisual: boolean
+): string[] {
   const config = getStepConfig(step as any);
   const tabs = [config.tab_name];
   if (step === 2) tabs.push("Relationships");
   if (step === 4) tabs.push("Completeness");
-  if (enableFlags && step >= 3) tabs.push("Flags");
+  if (enableVisual) tabs.push("Visual");
+  if (enableFlags) tabs.push("Flags");
+  if (enableStandards) tabs.push("Standards");
   return tabs;
 }
 
@@ -22,10 +32,13 @@ export default function ArtifactPanel() {
   const { state, dispatch } = useAppState();
   const { theme } = useTheme();
   const currentStep = state.lifecycle.current_step;
-  const tabs = getTabsForStep(currentStep, theme.features.enableFlagSystem);
+  const tabs = getTabsForStep(
+    currentStep,
+    theme.features.enableFlagSystem,
+    theme.features.enableStandardsView,
+    theme.features.enableVisualGraph
+  );
   const activeTab = state.ui.activeArtifactTab;
-
-  // Ensure active tab is valid for current step
   const resolvedTab = tabs.includes(activeTab) ? activeTab : tabs[0];
 
   const handleTabChange = (tab: string) => {
@@ -33,6 +46,18 @@ export default function ArtifactPanel() {
   };
 
   const renderContent = () => {
+    // Cross-step tabs
+    if (resolvedTab === "Standards") {
+      return <StandardsView stepNumber={currentStep} />;
+    }
+    if (resolvedTab === "Flags") {
+      return <FlagsList />;
+    }
+    if (resolvedTab === "Visual") {
+      return <GraphView stepNumber={currentStep} />;
+    }
+
+    // Step-specific tabs
     switch (currentStep) {
       case 1:
         if (resolvedTab === "PRD Draft") return <PRDView />;
@@ -55,7 +80,6 @@ export default function ArtifactPanel() {
       <TabBar tabs={tabs} activeTab={resolvedTab} onTabChange={handleTabChange} />
       <div className="flex-1 flex flex-col overflow-y-auto">
         {renderContent()}
-        {/* Gate approval at bottom of scroll — user must scroll to reach it */}
         <GateApproval />
       </div>
     </div>

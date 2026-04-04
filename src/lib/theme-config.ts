@@ -63,6 +63,8 @@ export interface ThemeConfig {
     flagRed: string;
     flagBlue: string;
     flagGray: string;
+    flagPurple: string;
+    flagPurpleSurface: string;
 
     // Entity card borders (Step 2)
     entityFact: string;
@@ -157,6 +159,9 @@ export interface ThemeConfig {
     enableGoogleSheets: boolean;  // persist to Sheets (vs local-only)
     showCompletenessBar: boolean;
     showFieldHighlightAnimation: boolean;
+    enableStandardsView: boolean;     // show Standards tab on all steps
+    enableStandardsValidation: boolean; // validate edits against standards
+    enableVisualGraph: boolean;       // show Visual graph tab on all steps
   };
 }
 
@@ -196,6 +201,8 @@ export const SANA_THEME: ThemeConfig = {
     flagRed: "#EF4444",
     flagBlue: "#3B82F6",
     flagGray: "#9CA3AF",
+    flagPurple: "#8B5CF6",
+    flagPurpleSurface: "#EDE9FE",
     entityFact: "#BFDBFE",
     entityDim: "#99F6E4",
     entityRef: "#FDE68A",
@@ -269,6 +276,9 @@ export const SANA_THEME: ThemeConfig = {
     enableGoogleSheets: false,
     showCompletenessBar: true,
     showFieldHighlightAnimation: true,
+    enableStandardsView: true,
+    enableStandardsValidation: true,
+    enableVisualGraph: true,
   },
 };
 
