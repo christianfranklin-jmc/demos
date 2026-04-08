@@ -37,7 +37,7 @@ export function isSheetsConfigured(): boolean {
  * Read lifecycle state for a data product.
  */
 export async function readLifecycleState(
-  dataProductId: string
+  _dataProductId: string
 ): Promise<LifecycleState | null> {
   if (!isSheetsConfigured()) return null;
 

@@ -12,7 +12,6 @@
 
 import { useState, type ChangeEvent } from "react";
 import { useTheme } from "../../context/ThemeContext";
-import { THEME_PRESETS, type ThemeConfig } from "../../lib/theme-config";
 
 interface SettingsPanelProps {
   isOpen: boolean;
