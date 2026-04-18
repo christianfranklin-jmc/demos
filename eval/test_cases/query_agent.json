@@ -1,0 +1,50 @@
+[
+  {
+    "name": "intent_classification",
+    "prompt": "What are the top 5 clients by revenue?",
+    "expected_tools": ["classify_query_intent"],
+    "expected_contains": ["sql"]
+  },
+  {
+    "name": "schema_retrieval",
+    "prompt": "Show me the schema for FACT_REVENUE and DIM_CLIENT so I can write a query.",
+    "expected_tools": ["get_table_schema_for_query"],
+    "expected_contains": ["FACT_REVENUE", "DIM_CLIENT", "join_paths"]
+  },
+  {
+    "name": "sql_execution",
+    "prompt": "What is the total revenue by client segment?",
+    "expected_tools": ["validate_and_execute_query"],
+    "expected_contains": ["CLIENT_SEGMENT", "revenue"]
+  },
+  {
+    "name": "query_caching",
+    "prompt": "What are the top 5 clients by revenue?",
+    "expected_tools": ["check_query_cache", "validate_and_execute_query"],
+    "expected_contains": ["cache"]
+  },
+  {
+    "name": "visualization_intent",
+    "prompt": "Show me a chart of revenue trends over time.",
+    "expected_tools": ["classify_query_intent"],
+    "expected_contains": ["visualization"]
+  },
+  {
+    "name": "metadata_intent",
+    "prompt": "What tables are in this database?",
+    "expected_tools": ["classify_query_intent"],
+    "expected_contains": ["metadata"]
+  },
+  {
+    "name": "complex_join_query",
+    "prompt": "What is the average AUM by product category and client tier?",
+    "expected_tools": ["validate_and_execute_query"],
+    "expected_contains": ["AVG", "GROUP BY"]
+  },
+  {
+    "name": "self_correction",
+    "prompt": "Run this query with EXPLAIN validation: SELECT * FROM nonexistent_table",
+    "expected_tools": ["validate_and_execute_query"],
+    "expected_contains": ["failed", "error"]
+  }
+]

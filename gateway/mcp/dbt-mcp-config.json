@@ -1,0 +1,50 @@
+{
+  "mcp_servers": [
+    {
+      "name": "dbt-mcp",
+      "description": "dbt MCP server providing 40+ tools for dbt project management, testing, semantic layer queries, and lineage analysis.",
+      "transport": "stdio",
+      "command": "uvx",
+      "args": ["dbt-mcp"],
+      "env": {
+        "DBT_HOST": "${DBT_HOST}",
+        "DBT_TOKEN": "${DBT_TOKEN}",
+        "DBT_PROD_ENV_ID": "${DBT_PROD_ENV_ID}",
+        "DBT_DEV_ENV_ID": "${DBT_DEV_ENV_ID}"
+      },
+      "tool_groups": {
+        "migration": [
+          "generate_source",
+          "generate_staging_model",
+          "generate_model_yaml",
+          "compile"
+        ],
+        "enrichment": [
+          "get_all_models",
+          "get_model_details",
+          "get_lineage",
+          "search"
+        ],
+        "quality": [
+          "test",
+          "build",
+          "get_model_health",
+          "get_model_performance"
+        ],
+        "mapping": [
+          "get_lineage",
+          "get_model_parents",
+          "get_model_children",
+          "get_all_sources"
+        ],
+        "query": [
+          "execute_sql",
+          "text_to_sql",
+          "query_metrics",
+          "list_metrics",
+          "get_dimensions"
+        ]
+      }
+    }
+  ]
+}

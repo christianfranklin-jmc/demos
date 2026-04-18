@@ -208,10 +208,18 @@ with st.sidebar:
     user = st.text_input("User", value=os.environ.get("DB_USER", ""))
     password = st.text_input("Password", type="password",
                              value=os.environ.get("DB_PASSWORD", ""))
-    # Drivers available on main: postgresql, redshift
-    # Snowflake driver is on snow-iceberg-migration branch
-    driver_type = st.selectbox("Database Type", ["postgresql", "redshift"],
+    driver_type = st.selectbox("Database Type", ["postgresql", "redshift", "snowflake"],
         index=0)
+
+    # Snowflake-specific fields
+    if driver_type == "snowflake":
+        sf_account = st.text_input("Account", value=os.environ.get("SF_ACCOUNT", ""))
+        sf_warehouse = st.text_input("Warehouse", value=os.environ.get("SF_WAREHOUSE", ""))
+        sf_role = st.text_input("Role", value=os.environ.get("SF_ROLE", ""))
+        sf_authenticator = st.selectbox("Auth Method",
+            ["externalbrowser", "password"], index=0)
+        sf_schema = st.text_input("Schema", value=os.environ.get("SF_SCHEMA", "PUBLIC"))
+
     aws_profile = st.text_input("AWS Profile", value=os.environ.get(
         "AWS_PROFILE", "AdministratorAccess-637119802057"))
 
@@ -241,52 +249,75 @@ if "schema_context" not in st.session_state:
 # Connection + schema discovery handler
 # ---------------------------------------------------------------------------
 if connect_btn:
-    if not all([host, database, user, password]):
+    # Validate required fields based on driver type
+    if driver_type == "snowflake":
+        if not all([sf_account, database, user]):
+            st.sidebar.error("Account, Database, and User are required for Snowflake.")
+            connect_btn = False
+    elif not all([host, database, user, password]):
         st.sidebar.error("All connection fields are required.")
-    else:
-        with st.spinner("Connecting and discovering schema..."):
-            try:
-                source_id = f"{driver_type}_{database}"
+        connect_btn = False
+
+if connect_btn:
+    with st.spinner("Connecting and discovering schema..."):
+        try:
+            source_id = f"{driver_type}_{database}"
+            if driver_type == "snowflake":
+                create_driver(
+                    driver_type="snowflake",
+                    source_id=source_id,
+                    account=sf_account,
+                    user=user,
+                    password=password if sf_authenticator == "password" else "",
+                    warehouse=sf_warehouse,
+                    database=database,
+                    schema=sf_schema,
+                    role=sf_role,
+                    authenticator=sf_authenticator,
+                )
+            else:
                 create_driver(
                     driver_type=driver_type,
                     source_id=source_id,
                     host=host, port=int(port), database=database,
                     user=user, password=password,
                 )
-                agent = create_agent(profile_name=aws_profile)
 
-                # Ask the agent to scan and learn the schema
-                scan_result = agent(
-                    f"The database is already connected with source_id='{source_id}'. "
-                    f"Use scan_metadata to discover all tables, columns, primary keys, "
-                    f"and foreign keys. Then provide a brief summary of what you found — "
-                    f"list each table with its row count and key columns."
-                )
-                schema_text = _extract_text(scan_result)
+            agent = create_agent(profile_name=aws_profile)
 
-                st.session_state.agent = agent
-                st.session_state.connected = True
-                st.session_state.source_id = source_id
-                st.session_state.db_name = database
-                st.session_state.schema_context = schema_text
+            # Ask the agent to scan and learn the schema
+            scan_result = agent(
+                f"The database is connected with source_id='{source_id}'. "
+                f"Use scan_metadata to discover all tables, columns, primary keys, "
+                f"and foreign keys. Then provide a brief summary of what you found — "
+                f"list each table with its row count and key columns."
+            )
+            schema_text = _extract_text(scan_result)
 
-                # Build sidebar summary
-                lines = []
-                for line in schema_text.split("\n"):
-                    stripped = line.strip()
-                    if stripped.startswith("- ") or stripped.startswith("* "):
-                        lines.append(stripped)
-                st.session_state.schema_summary = "\n".join(lines[:20]) if lines else "Schema discovered."
+            st.session_state.agent = agent
+            st.session_state.connected = True
+            st.session_state.source_id = source_id
+            st.session_state.db_name = database
+            st.session_state.schema_context = schema_text
 
-                # Add discovery as first assistant message
-                st.session_state.messages = [{
-                    "role": "assistant",
-                    "content": f"**Schema discovered.** Here's what I found:\n\n{schema_text}",
-                }]
-                st.rerun()
+            # Build sidebar summary
+            lines = []
+            for line in schema_text.split("\n"):
+                stripped = line.strip()
+                if stripped.startswith("- ") or stripped.startswith("* "):
+                    lines.append(stripped)
+            summary = "\n".join(lines[:20]) if lines else "Schema discovered."
+            st.session_state.schema_summary = summary
 
-            except Exception as e:
-                st.sidebar.error(f"Connection failed: {e}")
+            # Add discovery as first assistant message
+            st.session_state.messages = [{
+                "role": "assistant",
+                "content": f"**Schema discovered.** Here's what I found:\n\n{schema_text}",
+            }]
+            st.rerun()
+
+        except Exception as e:
+            st.sidebar.error(f"Connection failed: {e}")
 
 # ---------------------------------------------------------------------------
 # Chat display

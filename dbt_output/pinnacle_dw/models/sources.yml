@@ -1,0 +1,27 @@
+version: 2
+
+sources:
+  - name: pinnacle_financial_demo_asingh
+    database: PINNACLE_FINANCIAL_DEMO_ASINGH
+    schema: ANALYTICS
+    description: >
+      Tables migrated from Snowflake PINNACLE_FINANCIAL_DEMO_ASINGH.ANALYTICS
+    tables:
+      - name: DIM_CLIENT
+        description: 'Client dimension with segmentation for revenue analytics'
+      - name: DIM_COST_CENTER
+        description: 'Cost center dimension for expense tracking and budget management'
+      - name: DIM_DATE
+        description: 'Date dimension for time-based financial analytics'
+      - name: DIM_GL_ACCOUNT
+        description: 'General Ledger account dimension for P&L and financial reporting'
+      - name: DIM_PRODUCT
+        description: 'Product dimension for investment strategies and fee structures'
+      - name: FACT_BUDGET
+        description: 'Budget fact table for financial planning and variance analysis'
+      - name: FACT_CLIENT_AUM
+        description: 'Client AUM snapshot fact table for tracking assets under management over time'
+      - name: FACT_EXPENSE
+        description: 'Expense fact table with budget variance tracking'
+      - name: FACT_REVENUE
+        description: 'Revenue fact table capturing all fee income by client, product, and time'

@@ -1,0 +1,26 @@
+[
+  {
+    "name": "generate_table_descriptions",
+    "prompt": "Generate business descriptions for DIM_CLIENT and FACT_REVENUE tables.",
+    "expected_tools": ["generate_descriptions"],
+    "expected_contains": ["description", "dimension", "revenue"]
+  },
+  {
+    "name": "column_descriptions",
+    "prompt": "Generate descriptions for all columns in the DIM_CLIENT table.",
+    "expected_tools": ["generate_descriptions"],
+    "expected_contains": ["CLIENT_KEY", "surrogate", "identifier"]
+  },
+  {
+    "name": "synonym_generation",
+    "prompt": "Build a synonym map for FACT_REVENUE so users can find metrics using business terms.",
+    "expected_tools": ["build_synonym_map"],
+    "expected_contains": ["revenue", "income", "sales"]
+  },
+  {
+    "name": "catalog_update",
+    "prompt": "Update the Snowflake catalog with the generated descriptions for DIM_CLIENT.",
+    "expected_tools": ["update_catalog_descriptions"],
+    "expected_contains": ["updated", "snowflake"]
+  }
+]

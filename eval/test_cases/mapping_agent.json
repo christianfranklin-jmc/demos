@@ -1,0 +1,26 @@
+[
+  {
+    "name": "entity_extraction",
+    "prompt": "Extract entities and relationships from the Pinnacle Financial schema for a knowledge graph.",
+    "expected_tools": ["extract_entities_and_relationships"],
+    "expected_contains": ["Table", "Column", "JOINS_TO", "REFERENCES"]
+  },
+  {
+    "name": "implicit_join_detection",
+    "prompt": "Identify all implicit join paths in the schema based on shared column names.",
+    "expected_tools": ["extract_entities_and_relationships"],
+    "expected_contains": ["IMPLICIT_JOIN", "KEY"]
+  },
+  {
+    "name": "rdf_triple_generation",
+    "prompt": "Generate RDF triples from the schema for loading into Neptune.",
+    "expected_tools": ["generate_rdf_triples"],
+    "expected_contains": ["ntriples", "triple"]
+  },
+  {
+    "name": "neptune_load",
+    "prompt": "Load the knowledge graph into Amazon Neptune.",
+    "expected_tools": ["load_to_neptune"],
+    "expected_contains": ["neptune", "triple_count"]
+  }
+]

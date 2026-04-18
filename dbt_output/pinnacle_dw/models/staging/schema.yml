@@ -1,0 +1,66 @@
+version: 2
+
+models:
+  - name: stg_pinnacle_financial_demo_asingh__dim_client
+    description: 'Client dimension with segmentation for revenue analytics'
+    columns:
+      - name: client_key
+        tests:
+          - unique
+          - not_null
+  - name: stg_pinnacle_financial_demo_asingh__dim_cost_center
+    description: 'Cost center dimension for expense tracking and budget management'
+    columns:
+      - name: cost_center_key
+        tests:
+          - unique
+          - not_null
+  - name: stg_pinnacle_financial_demo_asingh__dim_date
+    description: 'Date dimension for time-based financial analytics'
+    columns:
+      - name: date_key
+        tests:
+          - unique
+          - not_null
+  - name: stg_pinnacle_financial_demo_asingh__dim_gl_account
+    description: 'General Ledger account dimension for P&L and financial reporting'
+    columns:
+      - name: gl_account_key
+        tests:
+          - unique
+          - not_null
+  - name: stg_pinnacle_financial_demo_asingh__dim_product
+    description: 'Product dimension for investment strategies and fee structures'
+    columns:
+      - name: product_key
+        tests:
+          - unique
+          - not_null
+  - name: stg_pinnacle_financial_demo_asingh__fact_budget
+    description: 'Budget fact table for financial planning and variance analysis'
+    columns:
+      - name: budget_key
+        tests:
+          - unique
+          - not_null
+  - name: stg_pinnacle_financial_demo_asingh__fact_client_aum
+    description: 'Client AUM snapshot fact table for tracking assets under management over time'
+    columns:
+      - name: aum_key
+        tests:
+          - unique
+          - not_null
+  - name: stg_pinnacle_financial_demo_asingh__fact_expense
+    description: 'Expense fact table with budget variance tracking'
+    columns:
+      - name: expense_key
+        tests:
+          - unique
+          - not_null
+  - name: stg_pinnacle_financial_demo_asingh__fact_revenue
+    description: 'Revenue fact table capturing all fee income by client, product, and time'
+    columns:
+      - name: revenue_key
+        tests:
+          - unique
+          - not_null

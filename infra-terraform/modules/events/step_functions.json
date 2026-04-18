@@ -1,0 +1,129 @@
+{
+  "Comment": "Snowflake → AWS Migration Pipeline: 5-agent orchestration",
+  "StartAt": "Migration",
+  "States": {
+    "Migration": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::bedrock-agentcore:invoke",
+      "Parameters": {
+        "AgentRuntimeId.$": "$.migration_runtime_id",
+        "Prompt": "Connect to Snowflake and migrate all tables. Extract schema, generate Iceberg DDL, scaffold dbt project, validate row counts.",
+        "SessionId.$": "$.session_id"
+      },
+      "ResultPath": "$.migration_result",
+      "Next": "Enrichment",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "MigrationFailed",
+          "ResultPath": "$.error"
+        }
+      ],
+      "TimeoutSeconds": 1800
+    },
+    "MigrationFailed": {
+      "Type": "Fail",
+      "Error": "MigrationError",
+      "Cause": "Migration Agent failed — check logs for details."
+    },
+    "Enrichment": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::bedrock-agentcore:invoke",
+      "Parameters": {
+        "AgentRuntimeId.$": "$.enrichment_runtime_id",
+        "Prompt": "Generate descriptions for all migrated tables and columns. Update the catalog with enriched metadata. Build synonym maps for business metrics.",
+        "SessionId.$": "$.session_id"
+      },
+      "ResultPath": "$.enrichment_result",
+      "Next": "Quality",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "EnrichmentFailed",
+          "ResultPath": "$.error"
+        }
+      ],
+      "TimeoutSeconds": 1200
+    },
+    "EnrichmentFailed": {
+      "Type": "Fail",
+      "Error": "EnrichmentError",
+      "Cause": "Enrichment Agent failed — check logs for details."
+    },
+    "Quality": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::bedrock-agentcore:invoke",
+      "Parameters": {
+        "AgentRuntimeId.$": "$.quality_runtime_id",
+        "Prompt": "Generate quality rules for all tables. Run quality checks. Report any failures and generate remediation plans.",
+        "SessionId.$": "$.session_id"
+      },
+      "ResultPath": "$.quality_result",
+      "Next": "QualityGate"
+    },
+    "QualityGate": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.quality_result.overall_status",
+          "StringEquals": "FAIL",
+          "Next": "QualityRemediationRequired"
+        }
+      ],
+      "Default": "ParallelGraphAndQuery"
+    },
+    "QualityRemediationRequired": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sns:publish",
+      "Parameters": {
+        "TopicArn.$": "$.alert_topic_arn",
+        "Message": "Quality checks failed. Remediation required before proceeding.",
+        "Subject": "Data Quality Gate — Action Required"
+      },
+      "ResultPath": "$.alert_result",
+      "Next": "ParallelGraphAndQuery"
+    },
+    "ParallelGraphAndQuery": {
+      "Type": "Parallel",
+      "Branches": [
+        {
+          "StartAt": "Mapping",
+          "States": {
+            "Mapping": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::bedrock-agentcore:invoke",
+              "Parameters": {
+                "AgentRuntimeId.$": "$.mapping_runtime_id",
+                "Prompt": "Extract entities and relationships from the schema. Generate RDF triples and load into Neptune.",
+                "SessionId.$": "$.session_id"
+              },
+              "ResultPath": "$.mapping_result",
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "QueryValidation",
+          "States": {
+            "QueryValidation": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::bedrock-agentcore:invoke",
+              "Parameters": {
+                "AgentRuntimeId.$": "$.query_runtime_id",
+                "Prompt": "Validate the query pipeline. Run 5 test queries against the migrated data: top clients by revenue, monthly trends, expense breakdown, budget variance, AUM by segment.",
+                "SessionId.$": "$.session_id"
+              },
+              "ResultPath": "$.query_result",
+              "End": true
+            }
+          }
+        }
+      ],
+      "ResultPath": "$.parallel_results",
+      "Next": "PipelineComplete"
+    },
+    "PipelineComplete": {
+      "Type": "Succeed"
+    }
+  }
+}

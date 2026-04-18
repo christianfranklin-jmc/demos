@@ -1,0 +1,32 @@
+[
+  {
+    "name": "snowflake_schema_extraction",
+    "prompt": "Connect to Snowflake and extract the schema. How many tables are there and what are their types (dimension vs fact)?",
+    "expected_tools": ["connect_to_database", "extract_snowflake_schema"],
+    "expected_contains": ["DIM_", "FACT_", "dimension", "fact"]
+  },
+  {
+    "name": "iceberg_ddl_generation",
+    "prompt": "Generate Iceberg CREATE TABLE DDL for the DIM_CLIENT table with appropriate type mappings.",
+    "expected_tools": ["generate_iceberg_ddl"],
+    "expected_contains": ["CREATE TABLE", "USING iceberg", "string", "parquet"]
+  },
+  {
+    "name": "migration_strategy",
+    "prompt": "Analyze the schema and recommend a migration strategy for each table (full load vs incremental).",
+    "expected_tools": ["extract_snowflake_schema"],
+    "expected_contains": ["full_load", "partition"]
+  },
+  {
+    "name": "dbt_scaffold",
+    "prompt": "Generate a dbt project for the migrated Pinnacle Financial tables.",
+    "expected_tools": ["scaffold_migration_dbt_project"],
+    "expected_contains": ["dbt_project.yml", "sources.yml", "staging"]
+  },
+  {
+    "name": "row_count_validation",
+    "prompt": "Validate row counts for all tables in the source database.",
+    "expected_tools": ["validate_row_counts"],
+    "expected_contains": ["source_count", "DIM_CLIENT", "FACT_REVENUE"]
+  }
+]
