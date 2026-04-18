@@ -5,6 +5,16 @@
 **Status**: Draft
 **Input**: User description: "Combine the DSA MVP frontend with the PlatformAgent backend so the polished 4-step data product workflow (requirements → conceptual model → logical model → detailed spec) is driven by PlatformAgent's real AI agents and database tools instead of pre-scripted responses."
 
+## Clarifications
+
+### Session 2026-04-17
+
+- Q: What concurrent-user scale is the integration targeting? → A: Small team — up to 10 concurrent phData users (internal demos and evaluation).
+- Q: How are generated dbt project + semantic layer artifacts delivered to the user in deployed mode? → A: Browser zip download — response streams a zip; no server-side persistence; no new Terraform modules required.
+- Q: How are database credentials handled across sessions? → A: Session-only always — no persistence, no opt-in. Users re-enter credentials (or re-SSO) each session.
+- Q: How is a session identified for memory/isolation purposes? → A: Per-tab session ID stored in browser sessionStorage — survives refresh within that tab, does not survive tab close, new tab mints a new session ID. AgentCore Memory records are keyed on this ID.
+- Q: What timeout strategy applies to long-running agent operations (schema scan, dbt generation)? → A: Keepalive-driven over the existing SSE stream — unlimited duration while progress events flow; 30 seconds of stream silence is treated as a failure; a cancel button is always available to the user.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 — Live demo with real customer database (Priority: P1)
@@ -58,7 +68,7 @@ A phData presenter in an environment without database connectivity (conference W
 
 ### User Story 4 — Multi-user deployed access (Priority: P3)
 
-A phData team member accesses the combined application at a hosted URL (existing Amplify deployment) using their phData SSO credentials, so that multiple teammates can demo and evaluate the product without each provisioning their own local stack.
+A phData team member accesses the combined application at a hosted URL (existing Amplify deployment) using their phData SSO credentials, so that multiple teammates (up to roughly ten concurrent) can demo and evaluate the product without each provisioning their own local stack.
 
 **Why this priority**: Shared hosted access is important for team adoption and iteration but is not required to prove the core integration. Local Docker Compose already provides an adequate developer experience.
 
@@ -68,7 +78,7 @@ A phData team member accesses the combined application at a hosted URL (existing
 
 1. **Given** an authorized phData user visits the hosted URL, **When** they click sign-in, **Then** Cognito's hosted UI presents, SSO completes, and they are returned to the app authenticated.
 2. **Given** an authenticated user initiates the 4-step workflow, **When** an agent call is made, **Then** the request reaches the AgentCore Runtime via the Gateway with valid JWT and the agent responds within the same user experience as local mode.
-3. **Given** two authenticated users are using the app concurrently from different browsers, **When** each completes a workflow, **Then** neither user's database connections, generated artifacts, or conversation history are visible to the other.
+3. **Given** up to ten authenticated users are using the app concurrently from different browsers, **When** each completes a workflow, **Then** neither user's database connections, generated artifacts, nor conversation history are visible to the others, and all workflows complete within the success-criteria latency targets.
 
 ---
 
@@ -116,7 +126,7 @@ The Streamlit "Talk to Your Data" app and the Python CLI (`uv run python -m plat
 - **FR-005**: At Step 1 (Requirements / PRD), the system MUST allow the user to establish a live connection to a supported source database and discover its schema before drafting the PRD; the drafted PRD MUST reference entities, tables, and domains observed in the connected source rather than generic placeholders.
 - **FR-006**: At Step 2 (Conceptual Model), the system MUST propose entities and relationships derived from the actual foreign-key graph and naming conventions of the connected database, rendered in the existing ERD visualization.
 - **FR-007**: At Step 3 (Logical Model), the system MUST sample the real data of each proposed field and populate data types, nullability, and representative values from live query results rather than invented values.
-- **FR-008**: At Step 4 (Detailed Requirements), the system MUST produce a dbt project and semantic layer on disk that targets the connected source's adapter (dbt-postgres, dbt-redshift, or dbt-snowflake) and references the real tables/columns identified in earlier steps.
+- **FR-008**: At Step 4 (Detailed Requirements), the system MUST produce a dbt project and semantic layer that target the connected source's adapter (dbt-postgres, dbt-redshift, or dbt-snowflake) and reference the real tables/columns identified in earlier steps. In local developer mode the artifacts MUST be written to the local filesystem (`dbt_output/<project>/`). In deployed mode the artifacts MUST be packaged as a single zip and delivered to the user via a browser download initiated from the Step 4 UI; the server MUST NOT persist generated artifacts beyond the life of the request.
 - **FR-009**: Each step MUST preserve the existing gate-approval mechanism — the user must explicitly approve advancement — and MUST record gate decisions in a way that survives a browser refresh.
 - **FR-010**: The system MUST allow the user to re-run any prior step within the same session (for example, to re-scan the schema if tables were added) without losing decisions already approved at subsequent gates unless the user explicitly accepts invalidating them.
 
@@ -125,7 +135,7 @@ The Streamlit "Talk to Your Data" app and the Python CLI (`uv run python -m plat
 - **FR-011**: The system MUST support PostgreSQL, Redshift, and Snowflake as source databases selectable from the UI at session start.
 - **FR-012**: When the user selects Snowflake, the system MUST support SSO authentication via an external-browser redirect flow in addition to any password-based mode.
 - **FR-013**: The system MUST display connection status (not connected / connecting / connected / failed) in a persistent location in the UI throughout the session.
-- **FR-014**: The system MUST NOT persist database credentials beyond the active session unless the user has explicitly opted in to credential storage.
+- **FR-014**: The system MUST NOT persist database credentials beyond the active session under any circumstances. No opt-in storage mechanism is offered in this release: credentials live only in the active browser session's memory and are discarded on session end. Snowflake users rely on SSO/externalbrowser (no password typed); PostgreSQL/Redshift users retype credentials per session.
 
 #### Demo Mode
 
@@ -143,31 +153,31 @@ The Streamlit "Talk to Your Data" app and the Python CLI (`uv run python -m plat
 
 #### Observability & Feedback
 
-- **FR-023**: The system MUST surface agent progress to the user incrementally during long-running calls (schema scans, dbt generation) rather than freezing the UI with no feedback.
+- **FR-023**: The system MUST surface agent progress to the user incrementally during long-running calls (schema scans, dbt generation) rather than freezing the UI with no feedback. Progress events MUST be emitted by the backend at least every 30 seconds while an operation is in progress; 30 seconds of silence on the progress stream MUST be treated by the frontend as a failure. The frontend MUST always expose a cancel control for in-progress operations.
 - **FR-024**: The system MUST log agent traces via existing observability wiring (OpenTelemetry → CloudWatch) so that any failed workflow step can be diagnosed after the fact.
 - **FR-025**: The system MUST expose errors in a human-readable form at the point of failure (which step, which tool, what the underlying error was), not as a generic "something went wrong."
 
 #### Data Isolation & Session Integrity
 
-- **FR-026**: Concurrent users of the hosted deployment MUST NOT see each other's connection details, chat history, or generated artifacts.
-- **FR-027**: A single user's concurrent browser sessions MUST each have independent state; one session MUST NOT silently overwrite another's artifacts.
+- **FR-026**: The deployed application MUST support up to ten concurrent authenticated phData users without session-state cross-contamination: no user's connection details, chat history, or generated artifacts may be visible to another.
+- **FR-027**: A single user's concurrent browser sessions (e.g., two tabs) MUST each have independent state; each tab MUST mint its own session identifier, stored in the browser's per-tab session storage so that a refresh preserves that tab's state but a new tab always starts a fresh session. One tab MUST NOT silently overwrite another's artifacts.
 - **FR-028**: When a user switches source database mid-session, the system MUST either clearly discard prior artifacts with user confirmation or preserve them as read-only history — never silently mix artifacts from two sources.
 
 #### Conversation Continuity
 
-- **FR-029**: A user's workflow state (gate decisions, current step, generated artifacts, chat history) MUST survive a browser refresh within the same browser session when the backend's conversation memory facility is reachable.
+- **FR-029**: A user's workflow state (gate decisions, current step, generated artifacts, chat history) MUST survive a browser refresh within the same browser tab when the backend's conversation memory facility is reachable; the session identifier kept in per-tab session storage MUST be used to look up the persisted conversation and state. Closing the tab ends the session; reopening does not resume.
 - **FR-030**: When the memory facility is unreachable, the user MUST be warned before proceeding rather than silently losing continuity.
 
 ### Key Entities
 
-- **Source Database Connection**: A user-supplied handle to an external PostgreSQL, Redshift, or Snowflake database. Holds host/account, credentials (session-only by default), source type, schema, and current status. Scope: single session unless persisted by explicit user action.
+- **Source Database Connection**: A user-supplied handle to an external PostgreSQL, Redshift, or Snowflake database. Holds host/account, credentials, source type, schema, and current status. Scope: strictly single-session — credentials and connection handles are discarded when the session ends; no persistence path exists.
 - **Discovered Schema**: The structural metadata extracted from a Source Database Connection — tables, columns, data types, primary and foreign keys, row counts, sample values. Scope: single session.
 - **Data Product Specification**: The evolving user-facing artifact across all four steps — PRD (step 1), Conceptual Model/ERD (step 2), Logical Model (step 3), Detailed Requirements + dbt project + semantic layer (step 4). Scope: single session, with gate decisions recorded alongside.
 - **Gate Decision**: An explicit user approval (or rejection) at each step boundary; persists across browser refresh within a session.
 - **Workflow Step State**: Which step the user is currently on, which prior steps are completed, and which are invalidated by a re-run.
 - **Demo Mode Flag**: A per-session toggle that switches all four steps between live-backend and pre-scripted behavior.
 - **Agent Conversation**: The ongoing dialogue between the user and the backend agent, persisted by the existing memory facility so that a browser refresh does not lose history.
-- **Generated Artifact File**: Files written to disk at step 4 (dbt project, semantic layer YAML). Scope: local filesystem in developer mode; object storage or downloadable bundle in deployed mode.
+- **Generated Artifact File**: Files produced at Step 4 (dbt project, semantic layer YAML). Scope: written to local filesystem in developer mode; packaged as an in-memory zip and streamed to the browser for direct download in deployed mode. Deployed-mode artifacts are ephemeral — the server does not persist them after delivery.
 
 ## Success Criteria *(mandatory)*
 
@@ -182,7 +192,7 @@ The Streamlit "Talk to Your Data" app and the Python CLI (`uv run python -m plat
 - **SC-007**: No existing AWS-deployed resource is re-provisioned during the integration rollout; the existing Runtime, Gateway, Memory, Cognito User Pool, and Amplify app continue serving requests throughout the rollout.
 - **SC-008**: Demo-mode walkthrough completes all four steps with zero backend calls and zero network dependencies.
 - **SC-009**: A failed agent call surfaces a specific, actionable error message to the user within 5 seconds of failure detection, rather than an indefinite spinner or a generic "something went wrong."
-- **SC-010**: Two concurrent authenticated users of the hosted deployment can each complete independent workflows without any observable cross-contamination of state.
+- **SC-010**: Ten concurrent authenticated users of the hosted deployment can each complete independent workflows without observable cross-contamination of state, and without any user's end-to-end workflow latency exceeding the single-user targets by more than 25%.
 - **SC-011**: A browser refresh during any of the four steps restores the user's state (current step, gate decisions, partial artifacts) in more than 95% of refresh events when memory is healthy.
 - **SC-012**: The combined repository is self-contained: a newcomer can clone it, run `scripts/bootstrap.sh` and `docker-compose up`, and reach the first workflow step in under 20 minutes with no further documentation lookup.
 
@@ -193,11 +203,11 @@ The Streamlit "Talk to Your Data" app and the Python CLI (`uv run python -m plat
 - **Deployment target**: The existing AWS account, region, Cognito User Pool, Amplify app, AgentCore Runtime/Gateway/Memory, RDS, and Redshift Serverless resources are the deployment target. This feature does not provision a new stack.
 - **Source databases available for demos**: The bootstrapped Northwinds (PostgreSQL + Redshift) and the Pinnacle Financial Snowflake demo cover the supported source types.
 - **Authentication**: Hosted access uses the existing Cognito User Pool and its current user list. No user-management work is in scope.
-- **Credential handling**: Database credentials entered by the user are session-scoped by default; long-term credential storage is out of scope for this feature.
+- **Credential handling**: Database credentials entered by the user are strictly session-scoped. No persistence layer (localStorage, Secrets Manager, or otherwise) is provided in this release.
 - **Conversation memory**: The existing AgentCore Memory facility (30-day retention) provides refresh-survivable state. This feature does not alter retention.
 - **Frontend source**: The DSA frontend is imported from the `feat-enhancements-erd-visuals` branch (simpler useAgent, removed OpenQuestionsView, simplified ConceptualERD) rather than DSA's main branch.
 - **Demo mode scope**: Pre-scripted content reuses the bundled mock datasets (Atlan, Snowflake, Highspot, data-products) that already ship with the DSA frontend.
-- **Error handling**: Backend timeouts and transient failures use reasonable defaults — retry once with exponential backoff, surface a user-facing error on second failure, offer demo-mode continuation.
+- **Error handling**: Long-running operations use keepalive-driven timeouts over the existing SSE channel — as long as the backend emits progress events (at least every 30 seconds), the operation continues; 30 seconds of stream silence is treated as a failure. Transient failures (network blips, auth refresh) retry once with exponential backoff; a second failure surfaces a user-facing error and offers demo-mode continuation.
 - **Mobile support**: Out of scope for this feature. Desktop browsers only.
 - **Internationalization**: Out of scope. English-only UI.
 - **Constitution compliance**: Any new backend code follows the existing driver/tool/observability conventions already defined in the repository. Frontend code follows the DSA project's TypeScript conventions.

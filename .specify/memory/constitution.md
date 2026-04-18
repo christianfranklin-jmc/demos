@@ -1,6 +1,14 @@
 <!--
 Sync Impact Report
-- Version change: 2.0.0 → 2.1.0 (MINOR — dark mode + backend indicator)
+- Version change: 2.1.0 → 2.2.0 (MINOR — in-flight ADR updates required)
+- Modified: Addendum E — ADRs must be authored/updated at the moment a
+  decision is made (during /speckit.clarify, /speckit.plan, or any
+  implementation commit). End-of-session batching is no longer acceptable.
+- Templates requiring updates:
+  - plan-template.md ✅ no update needed (Constitution Check covers)
+  - spec-template.md ✅ no update needed
+  - tasks-template.md ✅ no update needed
+- Previous: 2.0.0 → 2.1.0 (MINOR — dark mode + backend indicator)
 - Modified: Article V — added dark-first default, dark surface colors,
   backend mode visibility requirement
 - Previous: 1.1.0 → 2.0.0 (MAJOR — complete restructure)
@@ -328,6 +336,16 @@ parameters, or Secrets Manager — never hardcoded.
 ### Addendum E — Observability and Traceability
 
 Every architectural decision is recorded as an ADR in `docs/adr/`.
+ADRs MUST be created or updated **in-flight** — at the moment a
+decision is made (during `/speckit.clarify`, `/speckit.plan`, or
+any implementation commit that embodies a new decision) — not
+batched to end-of-session or end-of-feature. Each clarification
+answer that changes scope, architecture, data model, or operational
+posture requires either a new ADR or an amendment to an existing one
+in the same commit that records the clarification. Reviewers SHOULD
+reject specs, plans, or PRs that land decisions without the
+corresponding ADR change.
+
 Agent runtime uses OpenTelemetry auto-instrumentation to CloudWatch
 Traces. Evaluation uses AgentCore built-in evaluators (on-demand +
 online sampling).
@@ -349,4 +367,4 @@ conventions. Amendments follow this procedure:
 4. Update `CLAUDE.md` if the change affects current-state documentation.
 5. Verify dependent templates (plan, spec, tasks) remain consistent.
 
-**Version**: 2.1.0 | **Ratified**: 2026-04-01 | **Last Amended**: 2026-04-01
+**Version**: 2.2.0 | **Ratified**: 2026-04-01 | **Last Amended**: 2026-04-17
