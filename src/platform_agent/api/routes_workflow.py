@@ -23,7 +23,7 @@ from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from ..session.memory_adapter import MemoryUnavailable
 from ..workflow.steps import STEP_REGISTRY, StepId
@@ -54,6 +54,35 @@ class SSOExternalBrowserCredential(BaseModel):
 Credential = PasswordCredential | SSOExternalBrowserCredential
 
 
+import re
+
+_ALL_WS = re.compile(r"\s+")
+
+
+def _trim(v: str | None) -> str | None:
+    """Strip leading/trailing whitespace; treat empty results as None."""
+    if v is None:
+        return None
+    stripped = v.strip()
+    return stripped or None
+
+
+def _strip_all_ws(v: str | None) -> str | None:
+    """Remove every whitespace character (DNS names and account IDs can't have any)."""
+    if v is None:
+        return None
+    cleaned = _ALL_WS.sub("", v)
+    return cleaned or None
+
+
+def _trim_required(v: str) -> str:
+    """Strip whitespace; reject empty results (raises for required fields)."""
+    stripped = v.strip()
+    if not stripped:
+        raise ValueError("value is empty after trimming whitespace")
+    return stripped
+
+
 class SourceConnection(BaseModel):
     # Suppress Pydantic's "schema" shadow warning; we keep `schema` as the
     # field name to match the wire contract documented in data-model.md §3.
@@ -68,6 +97,31 @@ class SourceConnection(BaseModel):
     role: str | None = None
     warehouse: str | None = None
     credential: Credential
+
+    # Auto-sanitize string fields so copy-paste artifacts (leading/trailing
+    # spaces, tabs, embedded spaces from wrapped URLs, etc.) don't reach the
+    # driver. psycopg2 rejects hostnames with any embedded whitespace with a
+    # confusing "could not translate host name" error.
+    #
+    # host/account: strip ALL whitespace (DNS names and Snowflake account IDs
+    # cannot legally contain whitespace anywhere).
+    # schema/role/warehouse: edge-trim only (these CAN contain valid chars we
+    # don't want to strip).
+    # database/user: edge-trim + reject empty (required fields).
+    @field_validator("host", "account", mode="before")
+    @classmethod
+    def _clean_hostlike(cls, v: object) -> object:
+        return _strip_all_ws(v) if isinstance(v, str) else v
+
+    @field_validator("schema", "role", "warehouse", mode="before")
+    @classmethod
+    def _trim_optional(cls, v: object) -> object:
+        return _trim(v) if isinstance(v, str) else v
+
+    @field_validator("database", "user", mode="before")
+    @classmethod
+    def _trim_required_field(cls, v: object) -> object:
+        return _trim_required(v) if isinstance(v, str) else v
 
 
 class StepRequest(BaseModel):
