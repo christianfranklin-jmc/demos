@@ -43,7 +43,12 @@ async def run(
     )
     metadata = scan_metadata_safe(source_id)
     tables = metadata.get("tables", []) if isinstance(metadata, dict) else []
-    fks = metadata.get("foreign_keys", []) if isinstance(metadata, dict) else []
+    # FKs may be (a) at top level or (b) nested per-table under each table's
+    # "foreign_keys" key — PostgreSQLDriver uses the nested shape. Accept both.
+    fks = list(metadata.get("foreign_keys", []) if isinstance(metadata, dict) else [])
+    for t in tables:
+        for fk in t.get("foreign_keys", []) or []:
+            fks.append(fk)
 
     entities = _build_entities(tables, request.connection.schema)
     relationships = _build_relationships(
