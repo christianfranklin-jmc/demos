@@ -186,6 +186,45 @@ Per-step tool allowlist:
 
 **Rejected alternatives**: free-form JSON (no type safety), OpenAI delta-only (too token-centric), Protocol Buffers (codegen overhead, negligible savings).
 
+### D15 — Cascading gate invalidation UX (from `/speckit.analyze` remediation U1)
+
+**Decision**: When a user re-runs an earlier step that has approved downstream gates, the frontend opens an `InvalidationConfirm` modal listing the steps that will be cleared. Confirming dispatches a single `WORKFLOW_INVALIDATE_DOWNSTREAM` reducer action that clears artifacts, gate decisions, and chat history for every step **after** the re-run step — earlier steps and the re-run step itself are preserved. Cancel aborts the re-run entirely.
+
+**Rationale**:
+- Matches FR-010 ("without losing decisions already approved at subsequent gates unless the user explicitly accepts invalidating them").
+- Single reducer action keeps state transitions atomic and testable.
+- A modal is the correct deliberate-moment affordance per Constitution Article VI ("Human gates are deliberate moments … not toasts or dismissible dialogs"). The invalidation prompt is itself a gate.
+- No silent cascading — the user sees which steps will be affected before confirming.
+
+**Rejected alternatives**:
+- Auto-invalidate without confirmation: violates FR-010.
+- Read-only "history" of invalidated steps: adds state-model complexity and visual noise for a rare flow.
+- Per-step individual re-confirmation: multiplies clicks without adding safety.
+
+**Implications for design**:
+- `frontend/src/components/gates/InvalidationConfirm.tsx` renders the modal.
+- `AppContext` reducer gains `WORKFLOW_INVALIDATE_DOWNSTREAM`.
+- Backend is unaware — invalidation is purely a frontend concern because Memory is append-only event-sourced; old events remain but the projection ignores them after the invalidation marker.
+
+### D16 — `memory_unreachable` error contract (from `/speckit.analyze` remediation U3)
+
+**Decision**: When the backend's AgentCore Memory adapter raises `MemoryUnavailable`, the workflow route emits a terminal SSE `ErrorEvent{code: "memory_unreachable", retriable: true, message: "Conversation memory is unavailable; your session will not survive a refresh."}` and closes the stream. The frontend sets `AppContext.memoryStatus = "unreachable"` and renders a persistent banner until the next successful event.
+
+**Rationale**:
+- Closes FR-030 explicitly — users are warned, not silently degraded.
+- `retriable: true` lets the frontend offer a retry that reconnects to Memory.
+- Extending `SSE event schema v1` (D14) with a new `code` value does not break schema compatibility — the frontend's parser already handles unknown codes as generic errors, and this one's presence is additive.
+
+**Rejected alternatives**:
+- Let the request fail with 503: loses the opportunity to keep the user on the step; forces re-navigation.
+- Silent continuation with ephemeral-only memory: violates FR-030.
+- Separate `/health/memory` poll endpoint: adds a second channel for something that only matters when an actual workflow request needs Memory.
+
+**Implications for design**:
+- `src/platform_agent/session/memory_adapter.py` defines a typed `MemoryUnavailable` exception.
+- Backend's `routes_workflow.py` wraps Memory calls in `try/except MemoryUnavailable` and emits the new error event.
+- Frontend `AppContext` gains `memoryStatus` state and `MEMORY_STATUS_SET` action; `ContextBar.tsx` renders the banner.
+
 ## Amendments
 
 Decisions landing in later `/speckit.tasks` or implementation will be appended here with a date stamp.
