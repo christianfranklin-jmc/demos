@@ -7,6 +7,7 @@ import MessageBubble from "./MessageBubble";
 import TypingIndicator from "./TypingIndicator";
 import SuggestedReplies from "./SuggestedReplies";
 import ChatInput from "./ChatInput";
+import CancelButton from "./CancelButton";
 import type { StepNumber } from "../../lib/types";
 
 export default function ChatPanel() {
@@ -110,6 +111,11 @@ export default function ChatPanel() {
         {!state.ui.isAgentThinking && suggestedReplies.length > 0 && (
           <SuggestedReplies replies={suggestedReplies} onSelect={handleSuggestedReply} />
         )}
+      </div>
+
+      {/* Cancel button — only visible while a backend run is in flight (T046). */}
+      <div className="flex justify-end px-3">
+        <CancelButton />
       </div>
 
       {/* Input */}

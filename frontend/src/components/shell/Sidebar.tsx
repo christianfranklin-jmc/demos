@@ -3,6 +3,7 @@ import { useAppState } from "../../context/AppContext";
 import { useTheme } from "../../context/ThemeContext";
 import { DATA_PRODUCTS, type DataProduct } from "../../data/mock/data-products";
 import type { StepNumber, StepStatus } from "../../lib/types";
+import ConnectionForm from "./ConnectionForm";
 
 interface SidebarProps {
   onSettingsOpen: () => void;
@@ -197,6 +198,11 @@ export default function Sidebar({ onSettingsOpen }: SidebarProps) {
           </div>
         ))}
       </nav>
+
+      {/* 001-dsa-agent-integration: source-database connection form. */}
+      <div className="px-3 py-2 border-t" style={{ borderColor: theme.colors.borderSubtle }}>
+        <ConnectionForm />
+      </div>
 
       {/* Settings trigger */}
       <div className="px-3 py-2 border-t" style={{ borderColor: theme.colors.borderSubtle }}>
