@@ -548,25 +548,33 @@ if [[ "$DO_SNOWFLAKE" == "true" ]]; then
 echo ""
 echo "--- Step 8: Snowflake configuration ---"
 
-# Prompt for credentials if not provided via flags
-if [[ -z "$SF_ACCOUNT" ]]; then
-    read -rp "  Snowflake account (e.g., lga76011): " SF_ACCOUNT
-fi
-if [[ -z "$SF_USER" ]]; then
-    read -rp "  Snowflake user (e.g., user@company.com): " SF_USER
-fi
-if [[ -z "$SF_DATABASE" ]]; then
-    read -rp "  Snowflake database: " SF_DATABASE
-fi
-if [[ -z "$SF_ROLE" ]]; then
-    read -rp "  Snowflake role (leave blank for default): " SF_ROLE
+# Prompt for credentials only when stdin is a terminal AND the flag was not
+# supplied. Under set -euo pipefail a `read -rp` with no input (piped/
+# background run) returns EOF and aborts the script silently — we detect
+# that here and skip the prompt block instead. Non-interactive runs that
+# want Snowflake wired must pass --sf-account / --sf-user / --sf-database.
+if [[ -t 0 ]]; then
+    if [[ -z "$SF_ACCOUNT" ]]; then
+        read -rp "  Snowflake account (e.g., lga76011): " SF_ACCOUNT
+    fi
+    if [[ -z "$SF_USER" ]]; then
+        read -rp "  Snowflake user (e.g., user@company.com): " SF_USER
+    fi
+    if [[ -z "$SF_DATABASE" ]]; then
+        read -rp "  Snowflake database: " SF_DATABASE
+    fi
+    if [[ -z "$SF_ROLE" ]]; then
+        read -rp "  Snowflake role (leave blank for default): " SF_ROLE
+    fi
+elif [[ -z "$SF_ACCOUNT" ]]; then
+    echo "  Non-interactive run: skipping Snowflake prompts (no --sf-account supplied)."
 fi
 
 echo "Snowflake config:"
-echo "  Account:   $SF_ACCOUNT"
-echo "  User:      $SF_USER"
+echo "  Account:   ${SF_ACCOUNT:-<unset>}"
+echo "  User:      ${SF_USER:-<unset>}"
 echo "  Warehouse: $SF_WAREHOUSE"
-echo "  Database:  $SF_DATABASE"
+echo "  Database:  ${SF_DATABASE:-<unset>}"
 echo "  Schema:    $SF_SCHEMA"
 echo "  Role:      ${SF_ROLE:-<default>}"
 echo "  Auth:      $SF_AUTHENTICATOR"
