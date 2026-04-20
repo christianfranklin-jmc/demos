@@ -116,3 +116,10 @@ variable "db_driver_type" {
   type        = string
   default     = "postgresql"
 }
+
+# 001-dsa-agent-integration
+variable "cors_allowed_origins" {
+  description = "Comma-separated origins allowed by the FastAPI CORS middleware (Amplify URL + localhost dev)."
+  type        = string
+  default     = "http://localhost:5173"
+}

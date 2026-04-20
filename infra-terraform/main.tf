@@ -55,6 +55,9 @@ module "backend" {
   db_password    = var.db_password
   db_driver_type = var.db_driver_type
 
+  # 001-dsa-agent-integration: FastAPI CORS allowlist. Amplify URL + localhost dev.
+  cors_allowed_origins = var.cors_allowed_origins
+
   tags = local.common_tags
 
   depends_on = [module.cognito]

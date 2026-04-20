@@ -79,6 +79,12 @@ variable "db_driver_type" {
   default     = "postgresql"
 }
 
+variable "cors_allowed_origins" {
+  description = "Comma-separated list of origins allowed by the FastAPI CORS middleware. Include the Amplify app URL and any dev hosts."
+  type        = string
+  default     = "http://localhost:5173"
+}
+
 # --- Outputs ---
 
 output "runtime_id" {

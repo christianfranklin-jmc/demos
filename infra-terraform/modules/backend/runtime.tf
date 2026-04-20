@@ -150,15 +150,22 @@ resource "aws_bedrockagentcore_agent_runtime" "main" {
   }
 
   environment_variables = {
-    DB_HOST         = var.db_host
-    DB_PORT         = tostring(var.db_port)
-    DB_NAME         = var.db_name
-    DB_USER         = var.db_user
-    DB_PASSWORD     = var.db_password
-    DB_DRIVER_TYPE  = var.db_driver_type
-    MEMORY_ID       = aws_bedrockagentcore_memory.main.id
-    STACK_NAME      = var.stack_name
-    AWS_REGION      = var.region
+    DB_HOST        = var.db_host
+    DB_PORT        = tostring(var.db_port)
+    DB_NAME        = var.db_name
+    DB_USER        = var.db_user
+    DB_PASSWORD    = var.db_password
+    DB_DRIVER_TYPE = var.db_driver_type
+    MEMORY_ID      = aws_bedrockagentcore_memory.main.id
+    STACK_NAME     = var.stack_name
+    AWS_REGION     = var.region
+    # 001-dsa-agent-integration
+    AGENT_MODE            = "deployed"
+    API_PORT              = "8080"
+    SESSION_HEADER_NAME   = "X-DSA-Session-ID"
+    CORS_ALLOWED_ORIGINS  = var.cors_allowed_origins
+    COGNITO_USER_POOL_ID  = var.user_pool_id
+    COGNITO_APP_CLIENT_ID = var.web_client_id
   }
 
   network_configuration {
