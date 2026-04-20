@@ -250,7 +250,19 @@ function handleEvent(event: SSEEventV1, ctx: RunStepContext): void {
       if (event.code === "memory_unreachable") {
         ctx.dispatch({ type: "MEMORY_STATUS_SET", status: "unreachable" });
       }
-      // TODO(T064): render a toast/inline error; offer retry if retriable.
+      // Surface the error in chat so the user isn't left staring at silence.
+      // The demo engine's opening-message effect won't re-fire while the user's
+      // message already occupies the step, so without this the UI appears to hang.
+      ctx.dispatch({
+        type: "ADD_MESSAGE",
+        message: {
+          data_product_id: "live",
+          step: 1,
+          message_role: "agent",
+          message_text: `⚠️ ${event.code}: ${event.message}`,
+          timestamp: new Date().toISOString(),
+        } as any,
+      });
       return;
 
     default: {
