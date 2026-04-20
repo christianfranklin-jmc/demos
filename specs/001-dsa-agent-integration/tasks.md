@@ -204,7 +204,7 @@ description: "Dependency-ordered task list for 001-dsa-agent-integration"
 
 ### Implementation
 
-- [ ] T069 [US4] Wire Cognito PKCE into `/Users/mwebb/Projects/dsa-platform/frontend/src/lib/auth.ts`: `signIn()`, `signOut()`, `getJwtToken()` using the existing `aws-amplify` configuration pointed at the existing User Pool (`us-east-1_iQ70gh7t7`) and Web Client (`18nqacih7h0drtth8ghobmlsac`).
+- [X] T069 [US4] Wire Cognito PKCE into `/Users/mwebb/Projects/dsa-platform/frontend/src/lib/auth.ts`: `signIn()`, `signOut()`, `getJwtToken()` using the existing `aws-amplify` configuration pointed at the existing User Pool (`us-east-1_iQ70gh7t7`) and Web Client (`18nqacih7h0drtth8ghobmlsac`).
 - [ ] T070 [US4] Gate the app shell behind authenticated state in `/Users/mwebb/Projects/dsa-platform/frontend/src/App.tsx`: in deployed mode (driven by `import.meta.env.VITE_BACKEND_MODE`), redirect unauthenticated users to Cognito hosted UI; on return, extract the JWT and thread it through every outbound request.
 - [X] T071 [US4] Implement JWT validation in `/Users/mwebb/Projects/dsa-platform/src/platform_agent/api/deps.py`: fetch JWKS from `https://cognito-idp.us-east-1.amazonaws.com/{USER_POOL_ID}/.well-known/jwks.json` on startup, verify signature + `aud` + `iss` per request, populate `SessionContext.cognito_sub` and `SessionContext.username`.
 - [X] T072 [US4] Add SSM parameter lookups to `/Users/mwebb/Projects/dsa-platform/src/platform_agent/api/deps.py` for `USER_POOL_ID` and `APP_CLIENT_ID` (reusing `patterns/utils/ssm.py`).

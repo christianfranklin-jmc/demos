@@ -38,6 +38,7 @@ import {
   logicalFromBackend,
   prdFromBackend,
 } from "../lib/adapters";
+import { getIdToken, isAuthEnabled } from "../lib/auth";
 
 const BACKEND_URL =
   (import.meta as any).env?.VITE_BACKEND_URL ?? "http://localhost:8080";
@@ -138,14 +139,19 @@ export function runStep(
     ctx.dispatch({ type: "SET_AGENT_THINKING", thinking: true });
     let silence: SilenceTimer | null = null;
     try {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        Accept: "text/event-stream",
+        "X-DSA-Session-ID": ctx.sessionId,
+      };
+      if (isAuthEnabled()) {
+        const idToken = getIdToken();
+        if (idToken) headers.Authorization = `Bearer ${idToken}`;
+      }
       const response = await fetch(`${BACKEND_URL}/workflow/step`, {
         method: "POST",
         signal: abortCtl.signal,
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "text/event-stream",
-          "X-DSA-Session-ID": ctx.sessionId,
-        },
+        headers,
         body: JSON.stringify(body),
       });
 
@@ -261,9 +267,14 @@ function handleEvent(event: SSEEventV1, ctx: RunStepContext): void {
  */
 async function triggerZipDownload(downloadUrl: string, sessionId: string): Promise<void> {
   try {
+    const headers: Record<string, string> = { "X-DSA-Session-ID": sessionId };
+    if (isAuthEnabled()) {
+      const idToken = getIdToken();
+      if (idToken) headers.Authorization = `Bearer ${idToken}`;
+    }
     const response = await fetch(`${BACKEND_URL}${downloadUrl}`, {
       method: "GET",
-      headers: { "X-DSA-Session-ID": sessionId },
+      headers,
     });
     if (!response.ok) {
       console.error("Zip download failed:", response.status, await response.text().catch(() => ""));
