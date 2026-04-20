@@ -1,0 +1,83 @@
+@import "tailwindcss";
+
+/* ============================================================
+   DSA MVP — Design Tokens
+   Matched to Sana UI (sana.ai, March 2026 screenshots)
+   ============================================================ */
+
+:root {
+  /* Surfaces */
+  --white: #FFFFFF;
+  --surface-subtle: #FAFAFA;
+  --surface-input: #F4F4F4;
+  --surface-active-nav: #EBEBEB;
+  --surface-hover: #F5F5F5;
+
+  /* Text */
+  --text-primary: #1A1A1A;
+  --text-secondary: #6B6B6B;
+  --text-tertiary: #9E9E9E;
+
+  /* Borders */
+  --border-subtle: #E8E8E8;
+
+  /* Primary actions */
+  --btn-primary-bg: #1A1A1A;
+  --btn-primary-text: #FFFFFF;
+  --btn-primary-hover: #333333;
+
+  /* DSA Accent — RESERVED FOR 3 USES ONLY:
+     1. Agent avatar badge
+     2. Active tab underline
+     3. Completeness bar + gate CTA */
+  --accent-teal: #3DDBB8;
+  --accent-teal-surface: #E8FBF6;
+
+  /* Flags */
+  --amber-flag: #D97706;
+  --amber-surface: #FEF3C7;
+  --red-flag: #EF4444;
+  --blue-flag: #3B82F6;
+  --gray-flag: #9CA3AF;
+
+  /* Entity card borders (Step 2) */
+  --entity-fact: #BFDBFE;
+  --entity-dim: #99F6E4;
+  --entity-ref: #FDE68A;
+  --entity-primary: #3DDBB8;
+
+  /* Layout */
+  --sidebar-width: 264px;
+  --context-bar-height: 44px;
+  --gate-banner-height: 64px;
+  --chat-ratio: 42%;
+  --artifact-ratio: 58%;
+
+  /* Shape */
+  --radius-nav: 8px;
+  --radius-input: 24px;
+  --radius-card: 10px;
+  --radius-entity: 10px;
+  --radius-badge: 4px;
+  --radius-pill: 16px;
+  --radius-suggested: 20px;
+  --radius-btn: 8px;
+
+  /* Spacing */
+  --card-padding: 14px 16px;
+  --section-gap: 20px;
+  --field-gap: 8px;
+
+  /* Typography — font stack */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+
+  /* Timing */
+  --duration-field-highlight: 300ms;
+  --duration-completeness: 300ms;
+  --duration-gate-confirm: 800ms;
+  --duration-gate-collapse: 300ms;
+  --duration-typing-indicator: 400ms;
+  --delay-suggested-reply: 150ms;
+  --stagger-suggested-reply: 50ms;
+}
