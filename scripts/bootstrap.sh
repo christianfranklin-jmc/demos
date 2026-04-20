@@ -720,11 +720,20 @@ if [[ "$DO_RDS" == "true" && -n "$DB_ENDPOINT" ]]; then
 echo ""
 echo "--- Step 11: Verifying dbt project ---"
 cd "$PROJECT_DIR"
-if uv run dbt deps --project-dir dbt_output/northwinds_dw --profiles-dir dbt_output/northwinds_dw > /dev/null 2>&1; then
-    uv run dbt compile --project-dir dbt_output/northwinds_dw --profiles-dir dbt_output/northwinds_dw > /dev/null 2>&1
-    echo "dbt compile: OK"
+# `uv run dbt` does not register dbt as a uv script — the executable lives at
+# .venv/bin/dbt. Use that full path so failures stay confined to an if/else
+# instead of crashing the whole bootstrap under set -euo pipefail.
+DBT_BIN="$PROJECT_DIR/.venv/bin/dbt"
+if [[ -x "$DBT_BIN" && -d "dbt_output/northwinds_dw" ]]; then
+    if "$DBT_BIN" deps --project-dir dbt_output/northwinds_dw --profiles-dir dbt_output/northwinds_dw > /dev/null 2>&1; then
+        "$DBT_BIN" compile --project-dir dbt_output/northwinds_dw --profiles-dir dbt_output/northwinds_dw > /dev/null 2>&1 \
+            && echo "dbt compile: OK" \
+            || echo "WARNING: dbt compile failed. Run manually."
+    else
+        echo "WARNING: dbt deps failed. Run manually after checking profiles.yml."
+    fi
 else
-    echo "WARNING: dbt deps/compile failed. Run manually after checking profiles.yml."
+    echo "Skipping dbt verify (no dbt binary or no dbt_output/northwinds_dw project — harmless)."
 fi
 fi
 
