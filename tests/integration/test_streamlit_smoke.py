@@ -31,7 +31,9 @@ def _pick_port() -> int:
 
 @pytest.mark.slow
 def test_streamlit_app_boots():
-    if not os.environ.get("DB_HOST") or os.environ["DB_HOST"].startswith("platform-agent-northwinds.XXXX"):
+    if not os.environ.get("DB_HOST") or os.environ["DB_HOST"].startswith(
+        "platform-agent-northwinds.XXXX"
+    ):
         pytest.skip("DB_HOST not configured")
 
     repo_root = Path(__file__).resolve().parents[2]
@@ -42,10 +44,17 @@ def test_streamlit_app_boots():
     port = _pick_port()
     proc = subprocess.Popen(
         [
-            sys.executable, "-m", "streamlit", "run", str(app_path),
-            "--server.port", str(port),
-            "--server.headless", "true",
-            "--server.fileWatcherType", "none",
+            sys.executable,
+            "-m",
+            "streamlit",
+            "run",
+            str(app_path),
+            "--server.port",
+            str(port),
+            "--server.headless",
+            "true",
+            "--server.fileWatcherType",
+            "none",
         ],
         cwd=str(repo_root),
         stdout=subprocess.PIPE,

@@ -13,12 +13,13 @@ is guarded by an ``asyncio.Lock``. A sweep task drops expired entries every 60 s
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import io
 import logging
 import zipfile
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 logger = logging.getLogger(__name__)
@@ -48,14 +49,12 @@ class ArtifactStore:
         handle = uuid4()
         entry = ArtifactEntry(
             payload=zip_bytes,
-            expires_at=datetime.now(tz=timezone.utc) + HANDLE_TTL,
+            expires_at=datetime.now(tz=UTC) + HANDLE_TTL,
             session_id=session_id,
         )
         async with self._lock:
             self._entries[handle] = entry
-        logger.info(
-            "artifact_store.register handle=%s size=%d bytes", handle, len(zip_bytes)
-        )
+        logger.info("artifact_store.register handle=%s size=%d bytes", handle, len(zip_bytes))
         return handle, entry
 
     async def consume(self, handle: UUID, session_id: UUID) -> bytes | None:
@@ -67,7 +66,7 @@ class ArtifactStore:
         if entry.session_id != session_id:
             logger.warning("artifact_store.consume session mismatch handle=%s", handle)
             return None
-        if datetime.now(tz=timezone.utc) >= entry.expires_at:
+        if datetime.now(tz=UTC) >= entry.expires_at:
             return None
         return entry.payload
 
@@ -80,10 +79,8 @@ class ArtifactStore:
     async def stop_sweeper(self) -> None:
         if self._sweep_task is not None:
             self._sweep_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._sweep_task
-            except asyncio.CancelledError:
-                pass
             self._sweep_task = None
 
     async def _sweep_loop(self) -> None:
@@ -92,7 +89,7 @@ class ArtifactStore:
             await self._sweep_once()
 
     async def _sweep_once(self) -> None:
-        now = datetime.now(tz=timezone.utc)
+        now = datetime.now(tz=UTC)
         async with self._lock:
             expired = [h for h, e in self._entries.items() if e.expires_at <= now]
             for handle in expired:

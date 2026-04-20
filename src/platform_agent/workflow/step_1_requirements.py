@@ -9,7 +9,7 @@ can layer a Strands agent call on top to enrich the prose.
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from ..api.events import (
     ArtifactUpdateEvent,
@@ -28,17 +28,17 @@ from ._shared import (
 
 if TYPE_CHECKING:
     from ..api.deps import SessionContext
-    from ..api.sse import SSEEmitter
     from ..api.routes_workflow import StepRequest
+    from ..api.sse import SSEEmitter
     from ..api.zip_stream import ArtifactStore
 
 
 async def run(
-    request: "StepRequest",
-    session: "SessionContext",
-    emitter: "SSEEmitter",
+    request: StepRequest,
+    session: SessionContext,
+    emitter: SSEEmitter,
     run_id: UUID,
-    artifact_store: "ArtifactStore",
+    artifact_store: ArtifactStore,
 ) -> None:
     assert request.connection is not None, "step 1 requires a connection"
     source_id = source_id_for(session, request.connection)

@@ -16,8 +16,6 @@ import os
 from typing import Any
 from uuid import uuid4
 
-import sys
-
 from bedrock_agentcore.runtime import BedrockAgentCoreApp, RequestContext
 from prompts.system import SYSTEM_PROMPT
 from strands import Agent
@@ -27,9 +25,9 @@ from tools.semantic_layer import generate_semantic_layer
 
 # Agent source package is copied into /app/platform_agent/
 from platform_agent.tools.toolkit_connect import connect_to_database
-from platform_agent.tools.toolkit_scan import scan_metadata, profile_database
-from platform_agent.tools.toolkit_query import run_query
 from platform_agent.tools.toolkit_ddl import execute_ddl
+from platform_agent.tools.toolkit_query import run_query
+from platform_agent.tools.toolkit_scan import profile_database, scan_metadata
 
 logger = logging.getLogger(__name__)
 

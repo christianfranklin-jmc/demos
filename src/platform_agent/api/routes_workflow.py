@@ -16,6 +16,7 @@ import asyncio
 import io
 import logging
 import zipfile
+from collections.abc import AsyncIterator
 from contextvars import copy_context
 from typing import Annotated, Literal
 from uuid import UUID, uuid4
@@ -62,7 +63,7 @@ class SourceConnection(BaseModel):
     account: str | None = None
     port: int | None = Field(default=None, ge=1, le=65535)
     database: str
-    schema: str | None = None  # noqa: A003
+    schema: str | None = None  # type: ignore[assignment]  # shadows BaseModel.schema by design
     user: str
     role: str | None = None
     warehouse: str | None = None
@@ -160,7 +161,7 @@ async def post_step(
     )
     await _registry.register(run_id, handler_task)
 
-    async def cleanup_wrapper():
+    async def cleanup_wrapper() -> AsyncIterator[bytes]:
         try:
             async for frame in emitter.stream():
                 yield frame
@@ -285,7 +286,6 @@ __all__ = ["router", "StepRequest", "SourceConnection"]
 # Helper used by tests: build an in-memory zip from a file-tree dict.
 def zip_from_dir(project_root: str) -> bytes:
     """Zip the contents of ``project_root`` (absolute path) into memory."""
-    import os
     from pathlib import Path
 
     buf = io.BytesIO()

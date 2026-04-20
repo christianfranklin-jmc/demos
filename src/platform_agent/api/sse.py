@@ -70,7 +70,7 @@ class SSEEmitter:
         while True:
             try:
                 event = await asyncio.wait_for(self._queue.get(), timeout=HEARTBEAT_IDLE_SECONDS)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 if self._closed.is_set() and self._queue.empty():
                     break
                 yield self._format(HeartbeatEvent())
@@ -87,7 +87,9 @@ class SSEEmitter:
         return f"event: {name}\ndata: {json.dumps(payload, default=str)}\n\n".encode()
 
 
-def make_progress_emitter(emitter: SSEEmitter, run_id: UUID) -> Callable[[ToolProgressEvent], None]:
+def make_progress_emitter(
+    emitter: SSEEmitter, run_id: UUID
+) -> Callable[[ToolProgressEvent], None]:
     """Return a callable tools can invoke via the heartbeat_emitter ContextVar.
 
     Ensures the run_id is stamped correctly even if tools forget to set it.

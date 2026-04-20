@@ -22,17 +22,17 @@ from ._shared import ensure_driver, sanitize_id, scan_metadata_safe, source_id_f
 
 if TYPE_CHECKING:
     from ..api.deps import SessionContext
-    from ..api.sse import SSEEmitter
     from ..api.routes_workflow import StepRequest
+    from ..api.sse import SSEEmitter
     from ..api.zip_stream import ArtifactStore
 
 
 async def run(
-    request: "StepRequest",
-    session: "SessionContext",
-    emitter: "SSEEmitter",
+    request: StepRequest,
+    session: SessionContext,
+    emitter: SSEEmitter,
     run_id: UUID,
-    artifact_store: "ArtifactStore",
+    artifact_store: ArtifactStore,
 ) -> None:
     assert request.connection is not None
     source_id = source_id_for(session, request.connection)

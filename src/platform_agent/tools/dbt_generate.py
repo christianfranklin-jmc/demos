@@ -192,9 +192,7 @@ def generate_dbt_project(
     for model in mart_models:
         name = model["name"]
         # Infer PK column from naming convention
-        if name.startswith("dim_"):
-            pk_col = f"{name}_key"
-        elif name.startswith("fct_"):
+        if name.startswith("dim_") or name.startswith("fct_"):
             pk_col = f"{name}_key"
         else:
             pk_col = "id"
@@ -214,7 +212,7 @@ def generate_dbt_project(
         "project_dir": base_dir,
         "files_created": created_files,
         "next_steps": [
-            f"Set environment variables: DBT_HOST, DBT_PORT, DBT_USER, DBT_PASSWORD, DBT_DBNAME",
+            "Set environment variables: DBT_HOST, DBT_PORT, DBT_USER, DBT_PASSWORD, DBT_DBNAME",
             f"cd {base_dir} && dbt deps --profiles-dir .",
             f"cd {base_dir} && dbt compile --profiles-dir .",
             f"cd {base_dir} && dbt run --profiles-dir .",

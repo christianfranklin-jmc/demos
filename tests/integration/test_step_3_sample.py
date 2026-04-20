@@ -10,9 +10,7 @@ import pytest
 from .conftest import parse_sse_stream
 
 
-def test_step_3_pulls_real_samples(
-    client, session_headers, northwinds_postgres_connection
-):
+def test_step_3_pulls_real_samples(client, session_headers, northwinds_postgres_connection):
     if northwinds_postgres_connection is None:
         pytest.skip("DB_HOST not set to a live Northwinds instance")
 

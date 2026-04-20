@@ -9,7 +9,7 @@ See contracts/sse-events.md for wire-level rules and ADR-015 D14 for rationale.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Annotated, Literal
 from uuid import UUID
 
@@ -17,7 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 def _now() -> datetime:
-    return datetime.now(tz=timezone.utc)
+    return datetime.now(tz=UTC)
 
 
 class _EventBase(BaseModel):
@@ -147,7 +147,10 @@ ArtifactPayload = PrdPayload | ConceptualModelPayload | LogicalModelPayload
 
 
 class ArtifactUpdateEvent(_EventBase):
-    """Incremental artifact render — replaces any prior update with the same (step, artifact_type)."""
+    """Incremental artifact render.
+
+    Replaces any prior update with the same (step, artifact_type) pair.
+    """
 
     run_id: UUID
     step: Literal["requirements", "conceptual", "logical", "detailed"]
@@ -179,7 +182,11 @@ ErrorCode = Literal[
 
 
 class ErrorEvent(_EventBase):
-    """Terminal error. If `retriable` the frontend may offer a retry; never for unauthorized/validation."""
+    """Terminal error.
+
+    If ``retriable`` the frontend may offer a retry; never for
+    unauthorized/validation.
+    """
 
     run_id: UUID | None = None
     code: ErrorCode

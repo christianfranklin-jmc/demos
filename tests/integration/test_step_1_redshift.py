@@ -12,9 +12,7 @@ import pytest
 from .conftest import parse_sse_stream
 
 
-def test_step_4_produces_redshift_dbt_project(
-    client, session_headers, redshift_connection
-):
+def test_step_4_produces_redshift_dbt_project(client, session_headers, redshift_connection):
     if redshift_connection is None:
         pytest.skip("RS_HOST not configured")
 

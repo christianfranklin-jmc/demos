@@ -20,19 +20,19 @@ from ._shared import ensure_driver, scan_metadata_safe, source_id_for
 
 if TYPE_CHECKING:
     from ..api.deps import SessionContext
+    from ..api.routes_workflow import SourceConnection, StepRequest
     from ..api.sse import SSEEmitter
-    from ..api.routes_workflow import StepRequest
     from ..api.zip_stream import ArtifactStore
 
 logger = logging.getLogger(__name__)
 
 
 async def run(
-    request: "StepRequest",
-    session: "SessionContext",
-    emitter: "SSEEmitter",
+    request: StepRequest,
+    session: SessionContext,
+    emitter: SSEEmitter,
     run_id: UUID,
-    artifact_store: "ArtifactStore",
+    artifact_store: ArtifactStore,
 ) -> None:
     assert request.connection is not None
     source_id = source_id_for(session, request.connection)
@@ -94,7 +94,11 @@ async def run(
     )
 
     handle, entry = await artifact_store.register(zip_bytes, session.session_id)
-    ttl_seconds = int((entry.expires_at - entry.expires_at.__class__.now(entry.expires_at.tzinfo)).total_seconds())
+    ttl_seconds = int(
+        (
+            entry.expires_at - entry.expires_at.__class__.now(entry.expires_at.tzinfo)
+        ).total_seconds()
+    )
     if ttl_seconds <= 0:  # clock skew paranoia
         ttl_seconds = 60
 
@@ -110,7 +114,7 @@ async def run(
     )
 
 
-def _project_name_for(connection) -> str:
+def _project_name_for(connection: "SourceConnection") -> str:
     db = (connection.database or "data_product").lower()
     return f"{db}_dw"
 
@@ -142,6 +146,12 @@ def _count_zip_entries(zip_bytes: bytes) -> int:
 def _human(n: int) -> str:
     for unit in ("B", "KB", "MB"):
         if n < 1024 or unit == "MB":
-            return f"{n:.0f} {unit}" if unit == "B" else f"{n/1024:.1f} {unit}" if unit == "KB" else f"{n/1024/1024:.1f} {unit}"
+            return (
+                f"{n:.0f} {unit}"
+                if unit == "B"
+                else f"{n / 1024:.1f} {unit}"
+                if unit == "KB"
+                else f"{n / 1024 / 1024:.1f} {unit}"
+            )
         n //= 1024
     return f"{n} GB"

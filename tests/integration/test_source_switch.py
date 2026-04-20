@@ -9,8 +9,6 @@ from __future__ import annotations
 
 from uuid import uuid4
 
-from .conftest import parse_sse_stream
-
 
 def test_different_session_ids_dont_leak_artifacts(client):
     """Two concurrent sessions (simulated) against the router never produce

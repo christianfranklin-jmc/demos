@@ -75,7 +75,14 @@ def test_step_4_produces_compilable_dbt_zip(
             zf.extractall(tmp)
         project_dir = next(d for d in tmp.iterdir() if d.is_dir())
         result = subprocess.run(
-            ["dbt", "compile", "--project-dir", str(project_dir), "--profiles-dir", str(project_dir)],
+            [
+                "dbt",
+                "compile",
+                "--project-dir",
+                str(project_dir),
+                "--profiles-dir",
+                str(project_dir),
+            ],
             capture_output=True,
             text=True,
             timeout=120,

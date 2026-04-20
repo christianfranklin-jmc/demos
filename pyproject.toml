@@ -63,6 +63,30 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
+# B008 trips on the FastAPI idiom `param: T = Depends(dep)` which is the
+# documented pattern; ignoring globally per the FastAPI upstream guidance.
+ignore = ["B008"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "slow: runs a subprocess (Streamlit / dbt) and takes > 5 s — opt-in only",
+]
+asyncio_mode = "auto"
+
+# T086: mypy strict-mode gating for new modules introduced by
+# 001-dsa-agent-integration. Older modules are intentionally not strict yet.
+[tool.mypy]
+python_version = "3.12"
+warn_unused_configs = true
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = [
+    "platform_agent.api.*",
+    "platform_agent.workflow.*",
+    "platform_agent.session.*",
+]
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+warn_return_any = true

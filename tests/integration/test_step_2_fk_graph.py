@@ -47,7 +47,9 @@ def test_step_2_builds_fk_graph_from_northwinds(
     order_customer = [
         r
         for r in rels
-        if {"orders", "customers"}.issubset({r["from_entity_id"].lower(), r["to_entity_id"].lower()})
+        if {"orders", "customers"}.issubset(
+            {r["from_entity_id"].lower(), r["to_entity_id"].lower()}
+        )
         and not r["inferred"]
     ]
     assert order_customer, "Orders↔Customers FK must appear as a non-inferred relationship"

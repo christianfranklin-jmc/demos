@@ -54,7 +54,7 @@ def create_agent(
     max_tokens: int = 8192,
     profile_name: str | None = None,
     tools: list | None = None,
-    step_id: "StepId | None" = None,
+    step_id: StepId | None = None,
 ) -> Agent:
     """Create and return a configured Platform Agent.
 

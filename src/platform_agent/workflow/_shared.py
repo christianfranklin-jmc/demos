@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def source_id_for(session: "SessionContext", connection: "SourceConnection") -> str:
+def source_id_for(session: SessionContext, connection: SourceConnection) -> str:
     """Build a stable source_id from the session UUID + driver type + database.
 
     Stable within a session, unique across sessions. Used as the driver-registry key.
@@ -27,7 +27,7 @@ def source_id_for(session: "SessionContext", connection: "SourceConnection") -> 
     return f"{session.session_id}_{connection.driver_type}_{connection.database}"
 
 
-def ensure_driver(source_id: str, connection: "SourceConnection") -> Any:
+def ensure_driver(source_id: str, connection: SourceConnection) -> Any:
     """Return a driver for ``source_id``, creating it if missing.
 
     Credentials live only in the request-scoped driver instance; nothing is
@@ -62,8 +62,7 @@ def ensure_driver(source_id: str, connection: "SourceConnection") -> Any:
 
     if connection.driver_type not in DRIVER_REGISTRY:
         raise ValueError(
-            f"Unknown driver '{connection.driver_type}'. "
-            f"Registered: {sorted(DRIVER_REGISTRY)}"
+            f"Unknown driver '{connection.driver_type}'. Registered: {sorted(DRIVER_REGISTRY)}"
         )
 
     return create_driver(

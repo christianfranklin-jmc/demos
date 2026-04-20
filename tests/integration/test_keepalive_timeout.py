@@ -27,8 +27,8 @@ from platform_agent.api.sse import SSEEmitter, make_progress_emitter
 
 def _decode(frame: bytes) -> dict:
     lines = frame.decode("utf-8").strip().split("\n")
-    event = next(l.split(":", 1)[1].strip() for l in lines if l.startswith("event:"))
-    data = next(l.split(":", 1)[1].strip() for l in lines if l.startswith("data:"))
+    event = next(line.split(":", 1)[1].strip() for line in lines if line.startswith("event:"))
+    data = next(line.split(":", 1)[1].strip() for line in lines if line.startswith("data:"))
     return {"event": event, "data": json.loads(data)}
 
 

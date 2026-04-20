@@ -8,7 +8,7 @@ Cognito JWKS verification lands with T071 (US4).
 from __future__ import annotations
 
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Annotated, Literal
 from uuid import UUID
 
@@ -25,7 +25,7 @@ class SessionContext(BaseModel):
     cognito_sub: str | None = None
     username: str | None = None
     mode: Literal["local", "deployed"]
-    issued_at: datetime = Field(default_factory=lambda: datetime.now(tz=timezone.utc))
+    issued_at: datetime = Field(default_factory=lambda: datetime.now(tz=UTC))
 
 
 def _current_mode() -> Literal["local", "deployed"]:
@@ -49,7 +49,9 @@ async def get_session_context(
     try:
         session_id = UUID(x_dsa_session_id)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail="X-DSA-Session-ID is not a valid UUID") from exc
+        raise HTTPException(
+            status_code=400, detail="X-DSA-Session-ID is not a valid UUID"
+        ) from exc
 
     mode = _current_mode()
     cognito_sub: str | None = None

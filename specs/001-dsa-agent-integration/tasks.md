@@ -247,10 +247,10 @@ description: "Dependency-ordered task list for 001-dsa-agent-integration"
 - [X] T083 [P] Update `/Users/mwebb/Projects/dsa-platform/README.md` with the combined-repo 3-sentence description, uv-based setup, `.env.example` variable list, and a 10-line "Run the 4-step demo" block pointing at `quickstart.md`.
 - [X] T084 [P] Rewrite `/Users/mwebb/Projects/dsa-platform/PLAN.md` at the repo root: combined-repo build order, non-negotiable constraints (clarify answers Q1–Q5), and the "one architect at a time for demos, up to 10 for internal eval" scale target. Written for a coding agent reading it cold per Constitution Article VIII.
 - [X] T085 [P] Move `/Users/mwebb/Projects/dsa-platform/docs/adr/015-dsa-agent-integration.md` from **Status: Proposed** to **Status: Accepted**; append an "Implementation notes" section summarising any deviations discovered during Phase 3–7 execution.
-- [ ] T086 [P] Gate new backend modules on `mypy --strict` in `/Users/mwebb/Projects/dsa-platform/pyproject.toml` (per-module `[tool.mypy]` overrides for `platform_agent.api.*`, `platform_agent.workflow.*`, `platform_agent.session.*`).
-- [ ] T087 Run `uv run ruff check src/ tests/ patterns/` and `uv run ruff format --check src/ tests/ patterns/`; fix any violations introduced in Phases 2–7.
-- [ ] T088 Run `uv run mypy src/platform_agent/api src/platform_agent/workflow src/platform_agent/session --strict`; fix typing violations.
-- [ ] T089 Run full test suite: `uv run pytest tests/contract tests/integration -q`; all tests (including env-gated multi-source tests) pass or skip cleanly.
+- [X] T086 [P] Gate new backend modules on `mypy --strict` in `/Users/mwebb/Projects/dsa-platform/pyproject.toml` (per-module `[tool.mypy]` overrides for `platform_agent.api.*`, `platform_agent.workflow.*`, `platform_agent.session.*`).
+- [X] T087 Run `uv run ruff check src/ tests/ patterns/` and `uv run ruff format --check src/ tests/ patterns/`; fix any violations introduced in Phases 2–7.
+- [X] T088 Run `uv run mypy src/platform_agent/api src/platform_agent/workflow src/platform_agent/session --strict`; fix typing violations.
+- [X] T089 Run full test suite: `uv run pytest tests/contract tests/integration -q`; all tests (including env-gated multi-source tests) pass or skip cleanly.
 - [ ] T090 Verify OTel → CloudWatch: execute a complete Step 1–4 run in deployed mode; assert a trace with spans for every `@tool` invocation appears in CloudWatch within 2 minutes.
 - [ ] T091 Run the entire `/Users/mwebb/Projects/dsa-platform/specs/001-dsa-agent-integration/quickstart.md` end-to-end as a final acceptance gate; any failed step is a blocker.
 - [X] T092 Delete `/Users/mwebb/Projects/dsa-platform/docs/DSA_PLATFORM_INTEGRATION_PLAN.md` (the handoff doc) — its content is now superseded by `spec.md`, `plan.md`, `tasks.md`, and `ADR-015`. Move to `docs/archive/` if archival is preferred.

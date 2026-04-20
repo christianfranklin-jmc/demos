@@ -11,9 +11,7 @@ import pytest
 from .conftest import parse_sse_stream
 
 
-def test_step_1_cites_pinnacle_tables(
-    client, session_headers, pinnacle_snowflake_connection
-):
+def test_step_1_cites_pinnacle_tables(client, session_headers, pinnacle_snowflake_connection):
     if pinnacle_snowflake_connection is None:
         pytest.skip("SF_ACCOUNT not configured")
 
@@ -31,7 +29,11 @@ def test_step_1_cites_pinnacle_tables(
     assert response.status_code == 200, response.text
 
     frames = parse_sse_stream(response.text)
-    prd = [f for f in frames if f["event"] == "artifact_update" and f["data"].get("artifact_type") == "prd"]
+    prd = [
+        f
+        for f in frames
+        if f["event"] == "artifact_update" and f["data"].get("artifact_type") == "prd"
+    ]
     assert prd, "Step 1 must emit artifact_update.prd"
 
     cited = {t for s in prd[-1]["data"]["payload"]["sections"] for t in s["cited_tables"]}

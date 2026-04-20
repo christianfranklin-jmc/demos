@@ -45,7 +45,7 @@ class MemoryKey:
         return f"{self.PREFIX}:{self.user_scope}:{self.session_id}"
 
 
-def memory_key_for(session: "SessionContext") -> MemoryKey:
+def memory_key_for(session: SessionContext) -> MemoryKey:
     """Derive the canonical memory key for a request."""
     return MemoryKey(
         user_scope=session.cognito_sub or "local",

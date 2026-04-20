@@ -7,7 +7,7 @@ information_schema (via scan_metadata) and sample_values come from a bounded
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 from uuid import UUID
 
 from ..api.events import (
@@ -23,17 +23,17 @@ from ._shared import ensure_driver, sanitize_id, scan_metadata_safe, source_id_f
 
 if TYPE_CHECKING:
     from ..api.deps import SessionContext
-    from ..api.sse import SSEEmitter
     from ..api.routes_workflow import StepRequest
+    from ..api.sse import SSEEmitter
     from ..api.zip_stream import ArtifactStore
 
 
 async def run(
-    request: "StepRequest",
-    session: "SessionContext",
-    emitter: "SSEEmitter",
+    request: StepRequest,
+    session: SessionContext,
+    emitter: SSEEmitter,
     run_id: UUID,
-    artifact_store: "ArtifactStore",
+    artifact_store: ArtifactStore,
 ) -> None:
     assert request.connection is not None
     source_id = source_id_for(session, request.connection)
@@ -117,7 +117,9 @@ def _looks_like_measure(col_name: str, col: dict[str, Any]) -> bool:
     return False
 
 
-def _infer_role(col_name: str, col: dict[str, Any]) -> str:
+def _infer_role(
+    col_name: str, col: dict[str, Any]
+) -> Literal["id", "dimension", "measure", "attribute"]:
     name = col_name.lower()
     if name == "id" or name.endswith("_id"):
         return "id"

@@ -61,10 +61,16 @@ def test_tool_progress_bounds():
     # note capped at 100 chars
     with pytest.raises(ValidationError):
         ToolProgressEvent(
-            run_id=uuid4(), tool="scan_metadata", note="x" * 101,
+            run_id=uuid4(),
+            tool="scan_metadata",
+            note="x" * 101,
         )
     ok = ToolProgressEvent(
-        run_id=uuid4(), tool="scan_metadata", note="x" * 100, index=4, total=14,
+        run_id=uuid4(),
+        tool="scan_metadata",
+        note="x" * 100,
+        index=4,
+        total=14,
     )
     _roundtrip(ok)
 
@@ -165,7 +171,15 @@ def test_artifact_ready_roundtrip_and_terminal():
 
 
 def test_error_roundtrip_and_terminal():
-    for code in ("tool_error", "agent_error", "cancelled", "timeout", "unauthorized", "validation_error", "memory_unreachable"):
+    for code in (
+        "tool_error",
+        "agent_error",
+        "cancelled",
+        "timeout",
+        "unauthorized",
+        "validation_error",
+        "memory_unreachable",
+    ):
         event = ErrorEvent(code=code, message="x", retriable=False)  # type: ignore[arg-type]
         _roundtrip(event)
         assert is_terminal(event)

@@ -10,11 +10,11 @@ from __future__ import annotations
 
 import os
 import uuid
-from typing import Any, AsyncIterator
+from collections.abc import AsyncIterator
+from typing import Any
 
 from ag_ui.core import (
     EventType,
-    Message,
     RunAgentInput,
     RunFinishedEvent,
     RunStartedEvent,

@@ -11,9 +11,7 @@ import pytest
 from .conftest import parse_sse_stream
 
 
-def test_step_1_grounds_prd_in_northwinds(
-    client, session_headers, northwinds_postgres_connection
-):
+def test_step_1_grounds_prd_in_northwinds(client, session_headers, northwinds_postgres_connection):
     if northwinds_postgres_connection is None:
         pytest.skip("DB_HOST not set to a live Northwinds instance")
 
@@ -46,7 +44,12 @@ def test_step_1_grounds_prd_in_northwinds(
     # Assert at least one PRD section cites a real Northwinds table.
     final_prd = prd_updates[-1]["data"]["payload"]
     cited_everywhere = {t for s in final_prd["sections"] for t in s["cited_tables"]}
-    northwinds_tables = {"public.orders", "public.customers", "public.order_details", "public.products"}
+    northwinds_tables = {
+        "public.orders",
+        "public.customers",
+        "public.order_details",
+        "public.products",
+    }
     assert cited_everywhere & northwinds_tables, (
         f"PRD must cite real Northwinds tables; cited={cited_everywhere}"
     )

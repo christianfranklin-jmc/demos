@@ -5,7 +5,6 @@ Asserts behavior specified in contracts/session-header.md and ADR-015 D11.
 
 from __future__ import annotations
 
-import os
 from uuid import uuid4
 
 import pytest
