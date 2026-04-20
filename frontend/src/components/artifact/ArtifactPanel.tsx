@@ -9,6 +9,7 @@ import DetailedRequirements from "./DetailedRequirements";
 import StandardsView from "./StandardsView";
 import FlagsList from "./FlagsList";
 import GraphView from "./GraphView";
+import DemoBadge from "../shared/DemoBadge";
 import EmptyState from "../shared/EmptyState";
 import GateApproval from "../gates/GateApproval";
 
@@ -74,11 +75,13 @@ export default function ArtifactPanel() {
 
   return (
     <div
-      className="flex flex-col"
+      className="flex flex-col relative"
       style={{ width: `${theme.layout.artifactPanelPercent}%` }}
     >
       <TabBar tabs={tabs} activeTab={resolvedTab} onTabChange={handleTabChange} />
-      <div className="flex-1 flex flex-col overflow-y-auto">
+      <div className="flex-1 flex flex-col overflow-y-auto relative">
+        {/* FR-018: visible demo-mode indicator on every artifact panel. */}
+        <DemoBadge corner="top-right" />
         {renderContent()}
         <GateApproval />
       </div>

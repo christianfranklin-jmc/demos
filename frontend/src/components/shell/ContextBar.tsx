@@ -100,6 +100,8 @@ function BackendModeBadge({ mode }: { mode: "local" | "deployed" }) {
   );
 }
 
+// Inline header badge — the bigger corner badge in the artifact panel lives
+// in components/shared/DemoBadge.tsx (T061).
 function DemoModeBadge() {
   return (
     <span

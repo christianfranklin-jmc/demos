@@ -180,11 +180,11 @@ description: "Dependency-ordered task list for 001-dsa-agent-integration"
 ### Implementation
 
 - [X] T060 [P] [US3] Create `/Users/mwebb/Projects/dsa-platform/frontend/src/lib/demoMode.ts` exporting `resolveStep(stepId: StepId, userMessage: string, priorArtifacts: PriorArtifact[] | null): DemoModeResponse` that synthesises responses from `frontend/src/data/mock/` datasets (Atlan, Snowflake, Highspot, data-products). Responses mimic the same event shapes the live backend would emit (so the useAgent renderer is unchanged).
-- [ ] T061 [P] [US3] Create `/Users/mwebb/Projects/dsa-platform/frontend/src/components/shared/DemoBadge.tsx` — a fixed-position corner pill reading "DEMO" in phData orange `#F97316` with high contrast; props control which corner of the containing artifact panel.
+- [X] T061 [P] [US3] Create `/Users/mwebb/Projects/dsa-platform/frontend/src/components/shared/DemoBadge.tsx` — a fixed-position corner pill reading "DEMO" in phData orange `#F97316` with high contrast; props control which corner of the containing artifact panel.
 - [X] T062 [US3] Add demo-mode toggle to `/Users/mwebb/Projects/dsa-platform/frontend/src/components/shell/ContextBar.tsx`; bind to `DEMO_MODE_ENABLE`/`DEMO_MODE_DISABLE` actions on `AppContext`.
 - [X] T063 [US3] Short-circuit `/Users/mwebb/Projects/dsa-platform/frontend/src/hooks/useAgent.ts` `runStep` when `appState.demoMode.enabled`: invoke `demoMode.resolveStep` and feed results into the same reducer actions that live events use; never call the backend.
 - [X] T064 [US3] Extend the error boundary inside `/Users/mwebb/Projects/dsa-platform/frontend/src/hooks/useAgent.ts`: when a live backend call fails, surface an inline "Continue this step in demo mode" button; on click, dispatch `DEMO_MODE_AUTO_ENABLE` and retry the step from `demoMode.resolveStep`.
-- [ ] T065 [US3] Render `<DemoBadge>` in every artifact panel (`PRDView.tsx`, `ConceptualERD.tsx`, `LogicalModel.tsx`, `DetailedRequirements.tsx`) conditional on `appState.demoMode.enabled`.
+- [X] T065 [US3] Render `<DemoBadge>` in every artifact panel (`PRDView.tsx`, `ConceptualERD.tsx`, `LogicalModel.tsx`, `DetailedRequirements.tsx`) conditional on `appState.demoMode.enabled`.
 - [ ] T066 [US3] Run quickstart step 7 manually; record the demo-mode walkthrough as a canned demo moment per Constitution Article VIII.
 
 **Checkpoint**: Stories 1, 2, 3 all work independently.
@@ -231,8 +231,8 @@ description: "Dependency-ordered task list for 001-dsa-agent-integration"
 
 ### Verification
 
-- [ ] T079 [US5] Confirm no regression in `/Users/mwebb/Projects/dsa-platform/src/platform_agent/__main__.py` — the legacy zero-arg `create_agent()` shim from T020 MUST still work.
-- [ ] T080 [US5] Confirm no regression in `/Users/mwebb/Projects/dsa-platform/streamlit_app/app.py`; driver selection UI continues to populate via `DRIVER_REGISTRY`.
+- [X] T079 [US5] Confirm no regression in `/Users/mwebb/Projects/dsa-platform/src/platform_agent/__main__.py` — the legacy zero-arg `create_agent()` shim from T020 MUST still work.
+- [X] T080 [US5] Confirm no regression in `/Users/mwebb/Projects/dsa-platform/streamlit_app/app.py`; driver selection UI continues to populate via `DRIVER_REGISTRY`.
 - [ ] T081 [US5] Run quickstart step 8 manually; record any environment pre-reqs in README.
 
 **Checkpoint**: All five stories work independently.
