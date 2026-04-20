@@ -289,3 +289,241 @@ export interface GateConfig {
   hard_block_on_flags: boolean;
   soft_warn_threshold: number; // completeness % below which to warn
 }
+
+// ============================================================
+// PlatformAgent Integration — 001-dsa-agent-integration
+// Mirrors the Pydantic models in src/platform_agent/api/events.py
+// and src/platform_agent/workflow/steps.py. Keep in sync.
+// ============================================================
+
+// --- Workflow step identity (matches StrEnum on backend) ---
+
+export type StepId = "requirements" | "conceptual" | "logical" | "detailed";
+
+export const STEP_ID_TO_NUMBER: Record<StepId, StepNumber> = {
+  requirements: 1,
+  conceptual: 2,
+  logical: 3,
+  detailed: 4,
+};
+
+export const STEP_NUMBER_TO_ID: Partial<Record<StepNumber, StepId>> = {
+  1: "requirements",
+  2: "conceptual",
+  3: "logical",
+  4: "detailed",
+};
+
+// --- Source database connection (request-scoped; never persisted) ---
+
+export type DriverType = "postgresql" | "redshift" | "snowflake";
+
+export type Credential =
+  | { kind: "password"; password: string }
+  | { kind: "sso_externalbrowser" };
+
+export interface SourceConnection {
+  driver_type: DriverType;
+  host?: string;    // postgresql / redshift
+  account?: string; // snowflake
+  port?: number;
+  database: string;
+  schema?: string;
+  user: string;
+  role?: string;      // snowflake
+  warehouse?: string; // snowflake
+  credential: Credential;
+}
+
+// --- Request shape for POST /workflow/step ---
+
+export type PriorArtifact =
+  | { artifact_type: "prd"; payload: PrdPayload }
+  | { artifact_type: "conceptual_model"; payload: ConceptualModelPayload }
+  | { artifact_type: "logical_model"; payload: LogicalModelPayload };
+
+export interface StepRequest {
+  step_id: StepId;
+  user_message: string;
+  prior_artifact: PriorArtifact | null;
+  connection: SourceConnection | null;
+  resume: boolean;
+}
+
+// --- SSE event payloads (v1, mirrors backend events.py) ---
+
+export interface PrdSection {
+  heading: string;
+  body: string;
+  cited_tables: string[];
+  completeness_contribution: number;
+}
+
+export interface PrdPayload {
+  sections: PrdSection[];
+  completeness: number;
+}
+
+export interface BackendEntity {
+  id: string;
+  label: string;
+  source_table: string;
+  row_count_est: number | null;
+  key_columns: string[];
+}
+
+export interface BackendRelationship {
+  from_entity_id: string;
+  to_entity_id: string;
+  from_column: string;
+  to_column: string;
+  cardinality: "1:1" | "1:N" | "N:1" | "N:M";
+  inferred: boolean;
+}
+
+export interface ConceptualModelPayload {
+  entities: BackendEntity[];
+  relationships: BackendRelationship[];
+}
+
+export type LogicalFieldRole = "id" | "dimension" | "measure" | "attribute";
+
+export interface BackendLogicalField {
+  name: string;
+  data_type: string;
+  nullable: boolean;
+  sample_values: string[];
+  is_measure: boolean;
+  role: LogicalFieldRole;
+}
+
+export interface BackendLogicalTable {
+  id: string;
+  label: string;
+  grain: string | null;
+  fields: BackendLogicalField[];
+}
+
+export interface LogicalModelPayload {
+  tables: BackendLogicalTable[];
+}
+
+// --- SSE event union (discriminated by `event` channel name) ---
+
+export interface SSEHeartbeat {
+  event: "heartbeat";
+  v: 1;
+  t: string;
+}
+
+export interface SSEToolStart {
+  event: "tool_start";
+  v: 1;
+  t: string;
+  run_id: string;
+  tool: string;
+  args_summary: string;
+}
+
+export interface SSEToolProgress {
+  event: "tool_progress";
+  v: 1;
+  t: string;
+  run_id: string;
+  tool: string;
+  index: number | null;
+  total: number | null;
+  note: string;
+}
+
+export interface SSEToolResult {
+  event: "tool_result";
+  v: 1;
+  t: string;
+  run_id: string;
+  tool: string;
+  summary: string;
+}
+
+export interface SSEMessage {
+  event: "message";
+  v: 1;
+  t: string;
+  run_id: string;
+  role: "assistant";
+  content: string;
+  delta: boolean;
+}
+
+export interface SSEArtifactUpdate {
+  event: "artifact_update";
+  v: 1;
+  t: string;
+  run_id: string;
+  step: StepId;
+  artifact_type: "prd" | "conceptual_model" | "logical_model";
+  payload: PrdPayload | ConceptualModelPayload | LogicalModelPayload;
+}
+
+export interface SSEArtifactReady {
+  event: "artifact_ready";
+  v: 1;
+  t: string;
+  run_id: string;
+  step: "detailed";
+  handle: string;
+  size_bytes: number;
+  file_count: number;
+  expires_in_s: number;
+  download_url: string;
+}
+
+export type SSEErrorCode =
+  | "tool_error"
+  | "agent_error"
+  | "cancelled"
+  | "timeout"
+  | "unauthorized"
+  | "validation_error"
+  | "memory_unreachable";
+
+export interface SSEError {
+  event: "error";
+  v: 1;
+  t: string;
+  run_id: string | null;
+  code: SSEErrorCode;
+  message: string;
+  retriable: boolean;
+}
+
+export interface SSEDone {
+  event: "done";
+  v: 1;
+  t: string;
+  run_id: string;
+  step: "requirements" | "conceptual" | "logical";
+}
+
+export type SSEEventV1 =
+  | SSEHeartbeat
+  | SSEToolStart
+  | SSEToolProgress
+  | SSEToolResult
+  | SSEMessage
+  | SSEArtifactUpdate
+  | SSEArtifactReady
+  | SSEError
+  | SSEDone;
+
+// --- Demo mode (FR-015..FR-018, ADR-015 D13) ---
+
+export interface DemoModeState {
+  enabled: boolean;
+  reason: "user_toggle" | "auto_fallback" | null;
+  activatedAt: string | null;
+}
+
+// --- Memory health (FR-030, ADR-015 D16) ---
+
+export type MemoryStatus = "healthy" | "unreachable";

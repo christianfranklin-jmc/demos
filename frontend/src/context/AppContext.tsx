@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, type ReactNode } from "react";
+import React, { createContext, useContext, useEffect, useReducer, type ReactNode } from "react";
 import type {
   StepNumber,
   StepStatus,
@@ -9,9 +9,13 @@ import type {
   LogicalModelArtifact,
   DetailedRequirementsArtifact,
   QualityFlag,
+  SourceConnection,
+  DemoModeState,
+  MemoryStatus,
 } from "../lib/types";
 import { DEMO_PRODUCT } from "../lib/constants";
 import { createEmptyPRD } from "../lib/scoring";
+import { getOrMintSessionId } from "../lib/session";
 
 // ─── State Shape ───
 
@@ -30,6 +34,11 @@ interface AppState {
     gateActive: boolean;
     activeArtifactTab: string;
   };
+  // 001-dsa-agent-integration additions
+  sessionId: string;                  // Per-tab UUID; populated on mount via useEffect.
+  connection: SourceConnection | null; // Request-scoped DB connection; never persisted.
+  demoMode: DemoModeState;             // Frontend-only fallback switch (ADR-015 D13).
+  memoryStatus: MemoryStatus;          // FR-030 banner driver.
 }
 
 // ─── Actions ───
@@ -53,7 +62,16 @@ type AppAction =
   | { type: "SET_GATE_ACTIVE"; active: boolean }
   | { type: "SET_ACTIVE_TAB"; tab: string }
   | { type: "APPROVE_GATE"; step: StepNumber; approvedBy: string }
-  | { type: "LOAD_STATE"; state: Partial<AppState> };
+  | { type: "LOAD_STATE"; state: Partial<AppState> }
+  // 001-dsa-agent-integration additions
+  | { type: "SESSION_ID_SET"; sessionId: string }
+  | { type: "CONNECTION_SET"; connection: SourceConnection }
+  | { type: "CONNECTION_CLEAR" }
+  | { type: "DEMO_MODE_ENABLE" }
+  | { type: "DEMO_MODE_DISABLE" }
+  | { type: "DEMO_MODE_AUTO_ENABLE" }
+  | { type: "MEMORY_STATUS_SET"; status: MemoryStatus }
+  | { type: "WORKFLOW_INVALIDATE_DOWNSTREAM"; fromStep: StepNumber };
 
 // ─── Initial State ───
 
@@ -88,6 +106,14 @@ const initialState: AppState = {
     gateActive: false,
     activeArtifactTab: "PRD Draft",
   },
+  sessionId: "",  // populated by AppProvider's useEffect
+  connection: null,
+  demoMode: {
+    enabled: false,
+    reason: null,
+    activatedAt: null,
+  },
+  memoryStatus: "healthy",
 };
 
 // ─── Reducer ───
@@ -279,6 +305,64 @@ function appReducer(state: AppState, action: AppAction): AppState {
     case "LOAD_STATE":
       return { ...state, ...action.state };
 
+    case "SESSION_ID_SET":
+      return { ...state, sessionId: action.sessionId };
+
+    case "CONNECTION_SET":
+      return { ...state, connection: action.connection };
+
+    case "CONNECTION_CLEAR":
+      return { ...state, connection: null };
+
+    case "DEMO_MODE_ENABLE":
+      return {
+        ...state,
+        demoMode: { enabled: true, reason: "user_toggle", activatedAt: new Date().toISOString() },
+      };
+
+    case "DEMO_MODE_DISABLE":
+      return {
+        ...state,
+        demoMode: { enabled: false, reason: null, activatedAt: null },
+      };
+
+    case "DEMO_MODE_AUTO_ENABLE":
+      return {
+        ...state,
+        demoMode: { enabled: true, reason: "auto_fallback", activatedAt: new Date().toISOString() },
+      };
+
+    case "MEMORY_STATUS_SET":
+      return { ...state, memoryStatus: action.status };
+
+    case "WORKFLOW_INVALIDATE_DOWNSTREAM": {
+      // FR-010: clear every step strictly AFTER fromStep. The fromStep itself
+      // and every earlier step are preserved.
+      const nextStatuses = { ...state.lifecycle.step_statuses };
+      const nextApproved = state.lifecycle.approved_steps.filter((s) => s <= action.fromStep);
+      for (const s of [1, 2, 3, 4] as StepNumber[]) {
+        if (s > action.fromStep) {
+          nextStatuses[s] = "not_started";
+        }
+      }
+      return {
+        ...state,
+        lifecycle: {
+          ...state.lifecycle,
+          step_statuses: nextStatuses,
+          approved_steps: nextApproved,
+          current_step: action.fromStep,
+          last_updated_at: new Date().toISOString(),
+        },
+        artifacts: {
+          ...state.artifacts,
+          conceptual: action.fromStep < 2 ? null : state.artifacts.conceptual,
+          logical: action.fromStep < 3 ? null : state.artifacts.logical,
+          detailed: action.fromStep < 4 ? null : state.artifacts.detailed,
+        },
+      };
+    }
+
     default:
       return state;
   }
@@ -295,6 +379,16 @@ const AppContext = createContext<AppContextType | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(appReducer, initialState);
+
+  // Mint-or-restore the per-tab session ID exactly once. sessionStorage
+  // survives refreshes within this tab; new tabs get a fresh ID.
+  useEffect(() => {
+    if (!state.sessionId) {
+      dispatch({ type: "SESSION_ID_SET", sessionId: getOrMintSessionId() });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return <AppContext.Provider value={{ state, dispatch }}>{children}</AppContext.Provider>;
 }
 
