@@ -1,6 +1,37 @@
-# AWS Platform Agent
+# DSA Platform
 
-AI-powered data engineering agents that automate the journey from raw database schema to a working, queryable data product on AWS. Supports single-agent discovery and transformation (PostgreSQL, Redshift, Snowflake) and multi-agent orchestration for Snowflake → AWS migration via Apache Iceberg.
+Combined repo — the DSA MVP's polished 4-step data-product UX (React + Vite + Tailwind, dark-first) driven by real AI agents from the AWS Platform Agent (Python + Strands + Bedrock). Built for phData solution architects running live customer demos and discovery sessions.
+
+**What it does**: connect to a real database → walk through **Requirements → Conceptual Model → Logical Model → Detailed Spec** → download a runnable dbt project scaffolded from actual customer tables. Three source types (PostgreSQL, Redshift, Snowflake with SSO). Offline demo mode for network-constrained rooms.
+
+> Upstream histories preserved: `src/platform_agent/*` came from PlatformAgent; `frontend/*` came from DSA's `feat-enhancements-erd-visuals`. Integration tracked under `specs/001-dsa-agent-integration/` (spec, plan, tasks, contracts) and `docs/adr/015-dsa-agent-integration.md`.
+
+## Quick Start (local, end-to-end)
+
+```bash
+# 1. Bootstrap Northwinds PostgreSQL + write .env
+./scripts/bootstrap.sh --profile <YOUR_AWS_PROFILE> --services rds
+source .env
+
+# 2. Install Python + frontend deps
+uv pip install -e ".[dev,redshift,snowflake]"
+cd frontend && npm install && cd ..
+
+# 3. Backend: uvicorn on :8080
+uv run uvicorn platform_agent.api.app:app --host 0.0.0.0 --port 8080
+
+# 4. Frontend: Vite on :5173
+cd frontend && npm run dev
+
+# 5. Walk the 4 steps at http://localhost:5173
+```
+
+Streamlit ("Talk to Your Data") still works unchanged:
+`uv run streamlit run streamlit_app/app.py --server.port 8501`.
+
+CLI agent: `uv run python -m platform_agent --profile $AWS_PROFILE`.
+
+See `specs/001-dsa-agent-integration/quickstart.md` for the full walkthrough.
 
 ## Tech Stack
 

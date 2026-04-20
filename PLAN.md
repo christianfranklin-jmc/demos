@@ -1,8 +1,39 @@
-# AWS Platform Agent — Build Plan
+# DSA Platform — Build Plan
 
-AI-powered data engineering agent that automates the journey from raw
-database schema to a working, queryable data product on AWS. Built for
-phData client demos and internal enablement.
+Combined repo: DSA's 4-step React UX × PlatformAgent's Strands/Bedrock
+backend. Built for phData solution architects running live customer
+demos and discovery sessions.
+
+**Non-negotiable constraints (clarified 2026-04-17; see
+`docs/adr/015-dsa-agent-integration.md`):**
+
+1. **Scale target**: up to 10 concurrent phData users. Not customer-facing.
+2. **Credentials**: strictly session-scoped. No persistence (no
+   localStorage, no Secrets Manager).
+3. **Session ID**: per-browser-tab UUIDv4 in `sessionStorage`. Keys the
+   AgentCore Memory record (`dsa:{cognito_sub|local}:{uuid}`).
+4. **Long-running ops**: keepalive-driven over SSE — the backend emits
+   a progress event at least every 30s; 30s of silence = failure.
+5. **Step 4 dbt delivery** (deployed mode): zip streamed over HTTP from
+   an in-memory 60s single-use handle. No S3, no new Terraform modules.
+
+**Build order** (see `specs/001-dsa-agent-integration/tasks.md` for
+the 101-task breakdown, 16 commits to date):
+
+1. Setup + DSA import into `frontend/` — complete.
+2. Backend skeleton (Pydantic events, FastAPI, step registry, memory,
+   agent factory) — complete.
+3. Frontend scaffolding (session, types, parsers, AppContext, useAgent
+   shell) — complete.
+4. Contract tests — complete (30 green / 7 env-gated).
+5. Phase 3 MVP (step handlers, router, UI affordances) — complete.
+6. Phase 4 multi-source (Snowflake SSO, Redshift) — tests landed;
+   source-switch UX partial.
+7. Phase 5 demo mode — complete.
+8. Phase 6 deployed (Cognito PKCE + Terraform env-var edits) — pending
+   real AWS access.
+9. Phase 7 regression smokes (Streamlit + CLI) — landed.
+10. Phase 8 polish (docs + lint + quickstart acceptance) — in progress.
 
 ## Quick Start: Local (Streamlit)
 

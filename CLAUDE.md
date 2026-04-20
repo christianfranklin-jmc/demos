@@ -1,6 +1,8 @@
-# AWS Platform Agent
+# DSA Platform
 
-AI-powered data engineering agent that automates the journey from raw database schema to a working, queryable data product on AWS.
+Combined repo: DSA's polished 4-step React workflow × PlatformAgent's Strands/Bedrock agent backend. `frontend/` drives `src/platform_agent/api/` over SSE; every step renders artifacts grounded in the connected source database (PostgreSQL, Redshift, Snowflake).
+
+See `specs/001-dsa-agent-integration/` for the authoritative spec/plan/tasks and `docs/adr/015-dsa-agent-integration.md` for design decisions (D1–D16).
 
 ## Tech Stack
 
@@ -24,7 +26,29 @@ AI-powered data engineering agent that automates the journey from raw database s
 
 ```
 src/platform_agent/               # Agent source code
-  agent.py                        # Strands Agent factory — create_agent()
+  api/                            # Thin FastAPI layer (ADR-015 D8)
+    app.py                        # FastAPI app + CORS + lifespan
+    events.py                     # Pydantic SSE event schema v1 (D14)
+    deps.py                       # X-DSA-Session-ID header → SessionContext (D11)
+    sse.py                        # SSEEmitter + passive 10s heartbeat (D9)
+    zip_stream.py                 # In-memory zip store, 60s single-use (D10)
+    routes_workflow.py            # POST /workflow/step, GET artifact, cancel
+    routes_health.py              # GET /health (mode: local|deployed)
+  workflow/                       # Step-scoped orchestration (D12)
+    steps.py                      # StepId enum + STEP_REGISTRY (tool allowlist)
+    step_1_requirements.py        # Schema-grounded PRD
+    step_2_conceptual.py          # FK-graph entities/relationships
+    step_3_logical.py             # Real types + live top-5 samples
+    step_4_detailed.py            # dbt zip via generate_dbt_project
+    _shared.py                    # ensure_driver, scan_metadata_safe helpers
+  session/                        # Session + memory
+    memory_adapter.py             # MemoryKey, MemoryAdapter, MemoryUnavailable (D16)
+  prompts/steps/                  # Per-step system prompts (D12; Markdown files)
+    step_1_requirements.md
+    step_2_conceptual.md
+    step_3_logical.md
+    step_4_detailed.md
+  agent.py                        # Strands Agent factory — create_agent(step_id=...)
   models.py                       # BedrockModel config (Sonnet 4, Opus 4)
   __main__.py                     # Interactive CLI entry point
   serve.py                        # AgentCore Runtime entry point (AG-UI protocol, legacy)
@@ -85,7 +109,26 @@ gateway/tools/snowflake_tools/    # Snowflake-specific Gateway tools
 gateway/tools/iceberg_tools/      # Iceberg operations Gateway tools
   lambda_function.py              # convert_to_iceberg, export_data, register_glue_catalog
 gateway/mcp/dbt-mcp-config.json   # dbt MCP server config with per-agent tool groups
-frontend/                         # React + Vite + TypeScript + shadcn/ui
+frontend/                         # DSA React 18 + Vite 6 + Tailwind 4 (imported from dsa/feat-enhancements-erd-visuals)
+  src/
+    App.tsx, main.tsx             # DSA shell
+    context/
+      AppContext.tsx              # Extended with sessionId, connection, demoMode, memoryStatus
+      ThemeContext.tsx            # Dark default per Article V
+    hooks/
+      useAgent.ts                 # Step dispatcher — POST /workflow/step, stream SSE
+      useAgent.demo.ts            # Pre-scripted engine (demo mode fallback)
+    lib/
+      session.ts                  # Per-tab UUID in sessionStorage
+      adapters.ts                 # Backend payloads → DSA artifact shapes
+      demoMode.ts                 # Enable/disable demo mode
+      agentcore-client/parsers/v1/  # Version-gated SSE parser + SilenceTimer
+      auth.ts                     # Cognito PKCE (preserved from PlatformAgent)
+    components/
+      shell/ConnectionForm.tsx    # PostgreSQL/Redshift/Snowflake connection
+      shell/ContextBar.tsx        # backend-mode + demo-mode badges; memory banner
+      chat/CancelButton.tsx       # Aborts in-flight run via getCurrentRun()
+      gates/InvalidationConfirm.tsx  # FR-010 cascading-gate modal
 eval/                             # Evaluation scripts + test cases (25 cases across 5 agents)
   test_cases/migration_agent.json # 5 test cases (schema, DDL, strategy, dbt, validation)
   test_cases/enrichment_agent.json # 4 test cases (descriptions, columns, synonyms, catalog)
