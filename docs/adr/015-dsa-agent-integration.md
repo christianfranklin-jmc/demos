@@ -128,6 +128,64 @@ This ADR captures decisions made during the specification and clarification phas
 - Frontend SSE handler adds a silence-timer reset on every event and a 30s timeout alarm.
 - Existing OTel traces (per Addendum E) provide post-hoc visibility into which tool calls exceed typical durations.
 
+### D8 — Backend entry shape: FastAPI sidecar over Strands (from `/speckit.plan` research R1)
+
+**Decision**: Introduce `src/platform_agent/api/` as a thin FastAPI app that owns HTTP routing, SSE streaming, session-ID extraction, and zip response generation. The Strands agent factory is invoked in-process. The legacy `serve.py` AG-UI adapter remains untouched for existing integrations.
+
+**Rationale**: Control over SSE event schema, first-class support for streamed zip responses, and predictable keepalive emission from an async generator. Keeps the container count at one (no new Terraform module).
+
+**Rejected alternatives**: reuse the AG-UI adapter (custom events don't fit), new `BedrockAgentCoreApp` pattern (duplicates existing wiring), Lambda + API Gateway (cold start + new module).
+
+### D9 — Dual-layer keepalive heartbeats (from `/speckit.plan` research R2)
+
+**Decision**: A passive SSE emitter sends a `heartbeat` event every 10 seconds of idle, plus long-running `@tool` functions emit `tool_progress` events at natural boundaries (per-table, per-column, per-model). The frontend's 30-second silence timer resets on any event of either type.
+
+**Rationale**: Two layers cover two failure modes — a stuck tool still emits passive heartbeats; a live tool emits meaningful progress. Three heartbeats fit in the 30-second window, surviving a lost packet.
+
+### D10 — Two-phase zip delivery for Step 4 (from `/speckit.plan` research R3)
+
+**Decision**: Phase 1 — agent produces the project and emits an `artifact_ready` SSE event carrying a UUID handle (60-second TTL, single-use). Phase 2 — frontend issues `GET /workflow/artifact/{handle}` and receives a streamed zip. Handle store lives in `app.state` guarded by `asyncio.Lock`; sweep task drops expired entries every 60 seconds.
+
+**Rationale**: SSE cannot carry binary cleanly; a second HTTP request with `StreamingResponse` is the standard approach. Short TTL + single-use + session-ID binding prevents replay or inter-user leakage.
+
+**Rejected alternatives**: base64-in-SSE (33% bloat, awkward reconstruction), WebSocket channel (new protocol, Gateway upgrade untested), JSON inline (loses browser download UX).
+
+### D11 — Session-ID via `X-DSA-Session-ID` header; Memory key derivation (from `/speckit.plan` research R4)
+
+**Decision**: Frontend mints a UUIDv4 on first mount, stores in `sessionStorage`, and sends it on every request via the custom header `X-DSA-Session-ID`. Backend derives the AgentCore Memory key as `dsa:{cognito_sub or "local"}:{session_id}` — the user-scope prefix provides defense-in-depth against astronomically unlikely UUID collisions across identities.
+
+**Rationale**: Headers survive CORS preflight cleanly and don't leak into referer/query logs. User-scope prefix makes CloudWatch log filtering by user trivial and makes cross-identity collisions harmless by construction.
+
+**Rejected alternatives**: JWT custom claim (mutation complicates Cognito), query string (log leakage), request body (SSE endpoints want GET-style streaming).
+
+### D12 — Step-scoped prompts + tool allowlist (from `/speckit.plan` research R6)
+
+**Decision**: Each of the four DSA steps has its own system-prompt Markdown file under `src/platform_agent/prompts/steps/` and its own `StepConfig` entry declaring `allowed_tools`. The factory loads the prompt and wraps the Strands agent with a tool filter.
+
+Per-step tool allowlist:
+- Requirements: `connect_to_database`, `scan_metadata`
+- Conceptual: `scan_metadata`, `run_query` (FK inspection only)
+- Logical: `run_query`, `profile_database`
+- Detailed: `generate_dbt_project`, `generate_semantic_layer`
+
+**Rationale**: Constitution Article VI requires step-scoped personas and forbids cross-step context bleed. Markdown prompt files satisfy Article IV's "never inline strings." Tool filtering is the structural enforcement of Article VI beyond prompt discipline.
+
+### D13 — Demo mode is frontend-only (from `/speckit.plan` research R7)
+
+**Decision**: Demo mode lives entirely in the React app. `useAgent.ts` short-circuits when `AppContext.demoMode.enabled`, invoking `demoMode.resolveStep()` which synthesises responses from `frontend/src/data/mock/`. The backend never knows demo mode exists. Every demo-mode artifact renders a persistent `<DemoBadge>` (FR-018).
+
+**Rationale**: Demo mode must survive when the backend is unreachable — that's its entire purpose. Any backend coupling compromises that. Frontend-only also means no demo traffic in traces or analytics.
+
+**Rejected alternatives**: backend `?mode=demo` flag (dies with backend), separate mock-backend container (doubles the demo surface), banner-only indicator (fails the "cannot be mistaken" bar).
+
+### D14 — SSE event schema v1 (from `/speckit.plan` research R8)
+
+**Decision**: A closed set of event types (`heartbeat`, `tool_start`, `tool_progress`, `tool_result`, `message`, `artifact_update`, `artifact_ready`, `error`, `done`) with a `v: 1` field on every `data` payload. Pydantic models in `src/platform_agent/api/events.py` own the canonical shapes; frontend parsers under `frontend/src/lib/agentcore-client/parsers/` are version-gated. Every stream ends with exactly one terminal event.
+
+**Rationale**: Closed enum keeps frontend parser exhaustive and detects drift at compile time. Version field enables future evolution without breaking deployed clients.
+
+**Rejected alternatives**: free-form JSON (no type safety), OpenAI delta-only (too token-centric), Protocol Buffers (codegen overhead, negligible savings).
+
 ## Amendments
 
-Decisions landing in later `/speckit.clarify` answers, `/speckit.plan`, or implementation will be appended here with a date stamp.
+Decisions landing in later `/speckit.tasks` or implementation will be appended here with a date stamp.

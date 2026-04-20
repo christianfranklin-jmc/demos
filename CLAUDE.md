@@ -312,3 +312,10 @@ export DB_DRIVER_TYPE=postgresql  # or "redshift"
 ```
 
 The FAST pattern uses `BedrockAgentCoreApp` with `@app.entrypoint`, replacing the manual AG-UI event mapping in `serve.py`. Gateway tools are discovered via MCP. Memory persists conversations across sessions.
+
+## Active Technologies
+- Python 3.12+ (backend, agents, Lambda tools); TypeScript 5.6 + React 18 (frontend) per Constitution Article II. (001-dsa-agent-integration)
+- Ephemeral only. (001-dsa-agent-integration)
+
+## Recent Changes
+- 001-dsa-agent-integration: Added Python 3.12+ (backend, agents, Lambda tools); TypeScript 5.6 + React 18 (frontend) per Constitution Article II.
