@@ -246,8 +246,10 @@ function handleEvent(event: SSEEventV1, ctx: RunStepContext): void {
 
     case "artifact_update":
       if (event.artifact_type === "prd") {
+        // Live-mode PRD updates accumulate across turns — each clicked
+        // suggestion refines the spec instead of clobbering it.
         ctx.dispatch({
-          type: "UPDATE_PRD",
+          type: "APPEND_PRD",
           updates: prdFromBackend(event.payload as PrdPayload),
         });
       } else if (event.artifact_type === "conceptual_model") {

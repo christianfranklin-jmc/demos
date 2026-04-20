@@ -48,6 +48,7 @@ type AppAction =
   | { type: "SET_STEP_STATUS"; step: StepNumber; status: StepStatus }
   | { type: "ADD_MESSAGE"; message: ConversationMessage }
   | { type: "UPDATE_PRD"; updates: Partial<PRDArtifact> }
+  | { type: "APPEND_PRD"; updates: Partial<PRDArtifact> }
   | { type: "SET_CONCEPTUAL_MODEL"; model: ConceptualModelArtifact }
   | { type: "SET_LOGICAL_MODEL"; model: LogicalModelArtifact }
   | { type: "SET_DETAILED_REQUIREMENTS"; model: DetailedRequirementsArtifact }
@@ -154,6 +155,56 @@ function appReducer(state: AppState, action: AppAction): AppState {
           prd: { ...state.artifacts.prd, ...action.updates },
         },
       };
+
+    case "APPEND_PRD": {
+      // Smart-merge for live-mode artifact_update events: text fields get
+      // concatenated (user intent accumulates across turns instead of being
+      // overwritten by each new click), list fields are union'd, numeric
+      // completeness takes the max. Prior content is preserved.
+      const prior = state.artifacts.prd;
+      const next = action.updates;
+      const concat = (a: string | null | undefined, b: string | null | undefined): string | null => {
+        const aa = a?.trim() ?? "";
+        const bb = b?.trim() ?? "";
+        if (!bb) return aa || null;
+        if (!aa) return bb;
+        if (aa.includes(bb)) return aa; // already covered; don't duplicate
+        return `${aa}\n\n${bb}`;
+      };
+      const unionList = <T,>(a: T[] | null | undefined, b: T[] | null | undefined): T[] | null => {
+        const aa = a ?? [];
+        const bb = b ?? [];
+        if (aa.length === 0 && bb.length === 0) return null;
+        return Array.from(new Set([...aa, ...bb]));
+      };
+      return {
+        ...state,
+        artifacts: {
+          ...state.artifacts,
+          prd: {
+            ...prior,
+            business_objective:
+              "business_objective" in next
+                ? concat(prior.business_objective, next.business_objective)
+                : prior.business_objective,
+            current_state_pain:
+              "current_state_pain" in next
+                ? concat(prior.current_state_pain, next.current_state_pain)
+                : prior.current_state_pain,
+            success_criteria:
+              "success_criteria" in next
+                ? concat(prior.success_criteria, next.success_criteria)
+                : prior.success_criteria,
+            scope_out:
+              "scope_out" in next ? unionList(prior.scope_out, next.scope_out) : prior.scope_out,
+            completeness_score: Math.max(
+              prior.completeness_score ?? 0,
+              next.completeness_score ?? 0,
+            ),
+          },
+        },
+      };
+    }
 
     case "SET_CONCEPTUAL_MODEL":
       return { ...state, artifacts: { ...state.artifacts, conceptual: action.model } };
