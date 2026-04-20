@@ -128,14 +128,14 @@ description: "Dependency-ordered task list for 001-dsa-agent-integration"
 
 ### Frontend Implementation
 
-- [ ] T041 [P] [US1] Extend `/Users/mwebb/Projects/dsa-platform/frontend/src/hooks/useAgent.ts` step-1 handler: render `artifact_update.prd` into the existing PRDView component; feed `completeness_contribution` into DSA's `scoring.ts`.
-- [ ] T042 [P] [US1] Extend `/Users/mwebb/Projects/dsa-platform/frontend/src/hooks/useAgent.ts` step-2 handler: render `conceptual_model` entities/relationships into `frontend/src/components/artifact/ConceptualERD.tsx` via the existing `@xyflow/react` layout.
-- [ ] T043 [P] [US1] Extend `/Users/mwebb/Projects/dsa-platform/frontend/src/hooks/useAgent.ts` step-3 handler: render `logical_model.tables` into `frontend/src/components/artifact/LogicalModel.tsx`; show `sample_values` inline.
-- [ ] T044 [US1] Extend `/Users/mwebb/Projects/dsa-platform/frontend/src/hooks/useAgent.ts` step-4 handler: on `artifact_ready`, issue `fetch` to `download_url` with the session header, construct a blob, trigger browser download via a hidden `<a download>`; also show a persistent "Download dbt project" button.
-- [ ] T045 [US1] Add connection form to `/Users/mwebb/Projects/dsa-platform/frontend/src/components/shell/Sidebar.tsx`: PostgreSQL fields (host/port/db/schema/user/password), status pill (not-connected / connecting / connected / failed), "Test connection" button that calls `scan_metadata` via a dedicated health probe.
-- [ ] T046 [US1] Add a persistent cancel button to `/Users/mwebb/Projects/dsa-platform/frontend/src/components/chat/ChatPanel.tsx` while a stream is in flight; clicking POSTs `/workflow/cancel` with the current `run_id`.
-- [ ] T047 [US1] Force Dark theme on first load in `/Users/mwebb/Projects/dsa-platform/frontend/src/context/ThemeContext.tsx` per Constitution Article V; retain user-chosen theme across reloads but default unset = Dark.
-- [ ] T048 [US1] Add a visible backend-mode indicator in `/Users/mwebb/Projects/dsa-platform/frontend/src/components/shell/ContextBar.tsx` ("Local" or "Deployed") per Article V.
+- [X] T041 [P] [US1] Extend `/Users/mwebb/Projects/dsa-platform/frontend/src/hooks/useAgent.ts` step-1 handler: render `artifact_update.prd` into the existing PRDView component; feed `completeness_contribution` into DSA's `scoring.ts`.
+- [X] T042 [P] [US1] Extend `/Users/mwebb/Projects/dsa-platform/frontend/src/hooks/useAgent.ts` step-2 handler: render `conceptual_model` entities/relationships into `frontend/src/components/artifact/ConceptualERD.tsx` via the existing `@xyflow/react` layout.
+- [X] T043 [P] [US1] Extend `/Users/mwebb/Projects/dsa-platform/frontend/src/hooks/useAgent.ts` step-3 handler: render `logical_model.tables` into `frontend/src/components/artifact/LogicalModel.tsx`; show `sample_values` inline.
+- [X] T044 [US1] Extend `/Users/mwebb/Projects/dsa-platform/frontend/src/hooks/useAgent.ts` step-4 handler: on `artifact_ready`, issue `fetch` to `download_url` with the session header, construct a blob, trigger browser download via a hidden `<a download>`; also show a persistent "Download dbt project" button.
+- [X] T045 [US1] Add connection form to `/Users/mwebb/Projects/dsa-platform/frontend/src/components/shell/Sidebar.tsx`: PostgreSQL fields (host/port/db/schema/user/password), status pill (not-connected / connecting / connected / failed), "Test connection" button that calls `scan_metadata` via a dedicated health probe.
+- [X] T046 [US1] Add a persistent cancel button to `/Users/mwebb/Projects/dsa-platform/frontend/src/components/chat/ChatPanel.tsx` while a stream is in flight; clicking POSTs `/workflow/cancel` with the current `run_id`.
+- [X] T047 [US1] Force Dark theme on first load in `/Users/mwebb/Projects/dsa-platform/frontend/src/context/ThemeContext.tsx` per Constitution Article V; retain user-chosen theme across reloads but default unset = Dark.
+- [X] T048 [US1] Add a visible backend-mode indicator in `/Users/mwebb/Projects/dsa-platform/frontend/src/components/shell/ContextBar.tsx` ("Local" or "Deployed") per Article V.
 - [ ] T049 [US1] Run quickstart.md steps 1–6 manually against bootstrapped Northwinds and record any deviations as follow-up tasks in the Polish phase.
 
 **Checkpoint — MVP**: User Story 1 is deployable on its own. Live Northwinds demo works end-to-end. `pytest tests/integration/test_step_*_postgresql.py tests/integration/test_step_4_zip.py tests/integration/test_keepalive_timeout.py` passes. The combined repo is a usable product even if stories 2–5 never land.

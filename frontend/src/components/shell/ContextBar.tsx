@@ -2,6 +2,11 @@ import { useAppState } from "../../context/AppContext";
 import { useTheme } from "../../context/ThemeContext";
 import StatusPill from "../shared/StatusPill";
 
+// Constitution Article V: "Backend mode MUST be visible."
+// Pulled from Vite-injected env; defaults to "local" when unset.
+const BACKEND_MODE: "local" | "deployed" =
+  ((import.meta as any).env?.VITE_BACKEND_MODE as "local" | "deployed") ?? "local";
+
 export default function ContextBar() {
   const { state } = useAppState();
   const { theme } = useTheme();
@@ -16,30 +21,72 @@ export default function ContextBar() {
 
   const currentStep = state.lifecycle.current_step;
   const status = state.lifecycle.step_statuses[currentStep];
+  const memoryUnreachable = state.memoryStatus === "unreachable";
 
   return (
     <div
-      className="flex items-center justify-between px-4 border-b shrink-0"
-      style={{
-        height: `${theme.layout.contextBarHeight}px`,
-        borderColor: theme.colors.borderSubtle,
-      }}
+      className="flex flex-col border-b shrink-0"
+      style={{ borderColor: theme.colors.borderSubtle }}
     >
-      <div className="flex items-center">
-        <span
-          className="text-sm"
-          style={{ color: theme.colors.textPrimary, fontWeight: theme.typography.mediumWeight }}
-        >
-          {theme.scenario.dataProductName}
-        </span>
-        <span className="mx-2 text-sm" style={{ color: theme.colors.textTertiary }}>
-          &middot;
-        </span>
-        <span className="text-sm" style={{ color: theme.colors.textSecondary }}>
-          Step {currentStep} &mdash; {stepLabels[currentStep]}
-        </span>
+      <div
+        className="flex items-center justify-between px-4"
+        style={{ height: `${theme.layout.contextBarHeight}px` }}
+      >
+        <div className="flex items-center gap-2">
+          <span
+            className="text-sm"
+            style={{ color: theme.colors.textPrimary, fontWeight: theme.typography.mediumWeight }}
+          >
+            {theme.scenario.dataProductName}
+          </span>
+          <span className="mx-1 text-sm" style={{ color: theme.colors.textTertiary }}>
+            &middot;
+          </span>
+          <span className="text-sm" style={{ color: theme.colors.textSecondary }}>
+            Step {currentStep} &mdash; {stepLabels[currentStep]}
+          </span>
+          <BackendModeBadge mode={BACKEND_MODE} />
+          {state.demoMode.enabled && <DemoModeBadge />}
+        </div>
+        <StatusPill status={status} />
       </div>
-      <StatusPill status={status} />
+      {memoryUnreachable && (
+        <div
+          className="px-4 py-1.5 text-xs"
+          style={{
+            background: theme.colors.flagAmberSurface,
+            color: theme.colors.flagAmber,
+            borderTop: `1px solid ${theme.colors.borderSubtle}`,
+          }}
+        >
+          Conversation memory is unavailable — refresh durability is lost for this session.
+        </div>
+      )}
     </div>
+  );
+}
+
+function BackendModeBadge({ mode }: { mode: "local" | "deployed" }) {
+  const bg = mode === "deployed" ? "#2563EB" : "#475569";
+  return (
+    <span
+      className="text-[10px] uppercase tracking-wide rounded px-1.5 py-0.5"
+      style={{ background: bg, color: "#F1F5F9" }}
+      title={`Backend mode: ${mode}`}
+    >
+      {mode}
+    </span>
+  );
+}
+
+function DemoModeBadge() {
+  return (
+    <span
+      className="text-[10px] uppercase tracking-wide rounded px-1.5 py-0.5"
+      style={{ background: "#F97316", color: "#0F172A", fontWeight: 700 }}
+      title="Demo mode — content is pre-scripted"
+    >
+      demo
+    </span>
   );
 }

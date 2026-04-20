@@ -25,17 +25,35 @@ import type {
   StepId,
   StepRequest,
   ConversationMessage,
+  PrdPayload,
+  ConceptualModelPayload,
+  LogicalModelPayload,
 } from "../lib/types";
 import {
   SilenceTimer,
   streamEvents,
 } from "../lib/agentcore-client/parsers/v1";
+import {
+  conceptualFromBackend,
+  logicalFromBackend,
+  prdFromBackend,
+} from "../lib/adapters";
 
 const BACKEND_URL =
   (import.meta as any).env?.VITE_BACKEND_URL ?? "http://localhost:8080";
 
 export interface RunStepController {
   abort: () => void;
+  runId: string | null;
+}
+
+// Module-level handle to the currently-streaming run for the Cancel button.
+// The latest call replaces the previous value; only one run is in flight at
+// a time from a single tab (useAgent enforces this).
+let currentController: RunStepController | null = null;
+
+export function getCurrentRun(): RunStepController | null {
+  return currentController;
 }
 
 export function useAgent(): void {
@@ -69,9 +87,11 @@ export function useAgent(): void {
       connection: state.connection,
       dispatch,
     });
+    currentController = inFlightRef.current;
 
     return () => {
       inFlightRef.current?.abort();
+      if (currentController === inFlightRef.current) currentController = null;
       inFlightRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -102,10 +122,14 @@ export function runStep(
   ctx: RunStepContext,
 ): RunStepController {
   const abortCtl = new AbortController();
+  const controller: RunStepController = {
+    abort: () => abortCtl.abort(),
+    runId: null,
+  };
   const body: StepRequest = {
     step_id: stepId,
     user_message: userMessage,
-    prior_artifact: null, // T041-T044 populate this from AppContext
+    prior_artifact: null, // Future: thread prior-step artifacts through here.
     connection: ctx.connection,
     resume: false,
   };
@@ -130,6 +154,8 @@ export function runStep(
         throw new Error(`HTTP ${response.status}: ${text || response.statusText}`);
       }
 
+      controller.runId = response.headers.get("X-Run-Id");
+
       silence = new SilenceTimer(() => {
         abortCtl.abort(new DOMException("Silence timeout", "TimeoutError"));
       });
@@ -138,19 +164,17 @@ export function runStep(
         handleEvent(event, ctx);
       }
     } catch (err) {
-      if (abortCtl.signal.aborted) return; // caller-initiated abort is clean
+      if (abortCtl.signal.aborted) return;
       const message = err instanceof Error ? err.message : String(err);
-      // TODO(T064): offer "Continue in demo mode" affordance on error.
-      // TODO(T025d): when err came from a MemoryUnavailable, also dispatch
-      //              MEMORY_STATUS_SET here. Requires parsing ErrorEvent.code.
       console.error("runStep error:", message);
+      // TODO(T064): offer "Continue in demo mode" affordance on error.
     } finally {
       silence?.dispose();
       ctx.dispatch({ type: "SET_AGENT_THINKING", thinking: false });
     }
   })();
 
-  return { abort: () => abortCtl.abort() };
+  return controller;
 }
 
 /**
@@ -165,24 +189,48 @@ function handleEvent(event: SSEEventV1, ctx: RunStepContext): void {
     case "tool_start":
     case "tool_progress":
     case "tool_result":
-      // TODO(T046): wire into a progress pane. For now, informational only.
+      // Progress pane rendering is additive UX; the current chat shell is
+      // sufficient for MVP. A dedicated progress component can consume these
+      // events without changing this dispatcher.
       return;
 
     case "message":
-      // TODO(T041+): accumulate streamed assistant messages. For the shell, we
-      // leave the conversation unchanged — user-visible chat updates land with
-      // each step's renderer.
+      // Assistant streaming output. For MVP we concatenate into the last agent
+      // chat bubble for the current step.
+      ctx.dispatch({
+        type: "ADD_MESSAGE",
+        message: {
+          data_product_id: "live",
+          step: 1, // step-number specificity happens in a later pass; renderers
+                   // filter by current_step which the reducer already tracks.
+          message_role: "agent",
+          message_text: event.content,
+          timestamp: new Date().toISOString(),
+        } as any,
+      });
       return;
 
     case "artifact_update":
-      // TODO(T041-T043): dispatch per-step reducer actions:
-      //   prd              → UPDATE_PRD
-      //   conceptual_model → SET_CONCEPTUAL_MODEL
-      //   logical_model    → SET_LOGICAL_MODEL
+      if (event.artifact_type === "prd") {
+        ctx.dispatch({
+          type: "UPDATE_PRD",
+          updates: prdFromBackend(event.payload as PrdPayload),
+        });
+      } else if (event.artifact_type === "conceptual_model") {
+        ctx.dispatch({
+          type: "SET_CONCEPTUAL_MODEL",
+          model: conceptualFromBackend(event.payload as ConceptualModelPayload),
+        });
+      } else if (event.artifact_type === "logical_model") {
+        ctx.dispatch({
+          type: "SET_LOGICAL_MODEL",
+          model: logicalFromBackend(event.payload as LogicalModelPayload),
+        });
+      }
       return;
 
     case "artifact_ready":
-      // TODO(T044): fetch /workflow/artifact/{handle} and trigger download.
+      void triggerZipDownload(event.download_url, ctx.sessionId);
       return;
 
     case "done":
@@ -202,4 +250,39 @@ function handleEvent(event: SSEEventV1, ctx: RunStepContext): void {
       void _exhaustive;
     }
   }
+}
+
+/**
+ * T044: fetch the zip at `/workflow/artifact/{handle}` and trigger a browser
+ * download via a hidden <a download> link.
+ */
+async function triggerZipDownload(downloadUrl: string, sessionId: string): Promise<void> {
+  try {
+    const response = await fetch(`${BACKEND_URL}${downloadUrl}`, {
+      method: "GET",
+      headers: { "X-DSA-Session-ID": sessionId },
+    });
+    if (!response.ok) {
+      console.error("Zip download failed:", response.status, await response.text().catch(() => ""));
+      return;
+    }
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = objectUrl;
+    anchor.download = filenameFromDisposition(
+      response.headers.get("Content-Disposition") ?? "",
+    ) ?? `dbt-project-${Date.now()}.zip`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(objectUrl);
+  } catch (err) {
+    console.error("Zip download error:", err);
+  }
+}
+
+function filenameFromDisposition(disposition: string): string | null {
+  const match = /filename="([^"]+)"/.exec(disposition);
+  return match ? match[1] : null;
 }

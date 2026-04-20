@@ -7,12 +7,17 @@ import {
   type ReactNode,
 } from "react";
 import {
+  DARK_THEME,
   SANA_THEME,
   THEME_PRESETS,
   mergeTheme,
   parseThemeFromUrl,
   type ThemeConfig,
 } from "../lib/theme-config";
+
+// Constitution Article V: "Dark mode is the default."
+const DEFAULT_THEME = DARK_THEME;
+const DEFAULT_PRESET = "dark";
 
 // ─── Context Shape ───
 
@@ -31,28 +36,27 @@ const ThemeContext = createContext<ThemeContextType | null>(null);
 // ─── Provider ───
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<ThemeConfig>(SANA_THEME);
-  const [activePreset, setActivePreset] = useState<string | null>("sana");
+  const [theme, setThemeState] = useState<ThemeConfig>(DEFAULT_THEME);
+  const [activePreset, setActivePreset] = useState<string | null>(DEFAULT_PRESET);
 
-  // On mount: check URL params for theme overrides
+  // On mount: URL > localStorage > Dark default.
   useEffect(() => {
     const urlOverrides = parseThemeFromUrl();
     if (urlOverrides) {
-      setThemeState(mergeTheme(SANA_THEME, urlOverrides));
-      // Check if it matches a preset exactly
+      setThemeState(mergeTheme(DEFAULT_THEME, urlOverrides));
       const presetName = new URLSearchParams(window.location.search).get("theme");
       setActivePreset(presetName && THEME_PRESETS[presetName] ? presetName : "custom");
+      return;
     }
 
-    // Also check localStorage for saved theme
     const savedTheme = localStorage.getItem("dsa-theme");
-    if (savedTheme && !urlOverrides) {
+    if (savedTheme) {
       try {
         const parsed = JSON.parse(savedTheme);
-        setThemeState(mergeTheme(SANA_THEME, parsed));
+        setThemeState(mergeTheme(DEFAULT_THEME, parsed));
         setActivePreset(localStorage.getItem("dsa-theme-preset") || "custom");
       } catch {
-        // Invalid JSON — ignore
+        /* Invalid JSON — fall through to the Dark default. */
       }
     }
   }, []);
@@ -90,11 +94,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const resetTheme = useCallback(() => {
-    setThemeState(SANA_THEME);
-    setActivePreset("sana");
+    setThemeState(DEFAULT_THEME);
+    setActivePreset(DEFAULT_PRESET);
     localStorage.removeItem("dsa-theme");
     localStorage.removeItem("dsa-theme-preset");
   }, []);
+
+  // Prevent unused-import warnings in strict TS without changing public API.
+  void SANA_THEME;
 
   return (
     <ThemeContext.Provider
