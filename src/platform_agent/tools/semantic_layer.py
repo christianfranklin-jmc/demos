@@ -3,9 +3,30 @@
 from __future__ import annotations
 
 import os
+from uuid import uuid4
 
 import yaml
 from strands import tool
+
+
+def _emit_progress(note: str, index: int | None = None, total: int | None = None) -> None:
+    try:
+        from ..api.events import ToolProgressEvent
+        from ..api.sse import heartbeat_emitter
+    except ImportError:
+        return
+    emitter = heartbeat_emitter.get()
+    if emitter is None:
+        return
+    emitter(
+        ToolProgressEvent(
+            run_id=uuid4(),
+            tool="generate_semantic_layer",
+            note=note,
+            index=index,
+            total=total,
+        )
+    )
 
 
 @tool
@@ -50,6 +71,11 @@ def generate_semantic_layer(
                 - ratio: {"numerator": {"name": "<metric>"}, "denominator": {"name": "<metric>"}}
         output_dir: Directory to write into. Defaults to "dbt_output/<project_name>".
     """
+    _emit_progress(
+        f"generating semantic layer for {project_name}",
+        total=len(semantic_models) + len(metrics),
+    )
+
     base_dir = output_dir or os.path.join(os.getcwd(), "dbt_output", project_name)
     marts_dir = os.path.join(base_dir, "models", "marts")
     os.makedirs(marts_dir, exist_ok=True)

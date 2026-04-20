@@ -1,0 +1,64 @@
+"""FastAPI app — thin HTTP/SSE layer in front of the Strands agent.
+
+Mounts /health immediately; /workflow/* routes land in T035. Starts the zip-store
+sweeper on startup and tears it down on shutdown.
+
+Run locally:
+    uv run uvicorn platform_agent.api.app:app --host 0.0.0.0 --port 8080 --reload
+"""
+
+from __future__ import annotations
+
+import logging
+import os
+from contextlib import asynccontextmanager
+from typing import AsyncIterator
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from .routes_health import router as health_router
+from .zip_stream import ArtifactStore
+
+logger = logging.getLogger(__name__)
+
+
+def _cors_origins() -> list[str]:
+    raw = os.environ.get("CORS_ALLOWED_ORIGINS", "http://localhost:5173")
+    return [origin.strip() for origin in raw.split(",") if origin.strip()]
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Start/stop background tasks that live as long as the app does."""
+    store = ArtifactStore()
+    app.state.artifact_store = store
+    await store.start_sweeper()
+    try:
+        yield
+    finally:
+        await store.stop_sweeper()
+
+
+def create_app() -> FastAPI:
+    app = FastAPI(
+        title="DSA Platform Agent API",
+        version="0.1.0",
+        lifespan=lifespan,
+    )
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=_cors_origins(),
+        allow_credentials=False,
+        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_headers=["Content-Type", "Accept", "Authorization", "X-DSA-Session-ID"],
+    )
+
+    app.include_router(health_router)
+    # /workflow/* routes register in T035 once routes_workflow.py exists.
+
+    return app
+
+
+app = create_app()

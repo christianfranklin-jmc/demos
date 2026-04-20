@@ -4,8 +4,29 @@ from __future__ import annotations
 
 import os
 import textwrap
+from uuid import uuid4
 
 from strands import tool
+
+
+def _emit_progress(note: str, index: int | None = None, total: int | None = None) -> None:
+    try:
+        from ..api.events import ToolProgressEvent
+        from ..api.sse import heartbeat_emitter
+    except ImportError:
+        return
+    emitter = heartbeat_emitter.get()
+    if emitter is None:
+        return
+    emitter(
+        ToolProgressEvent(
+            run_id=uuid4(),
+            tool="generate_dbt_project",
+            note=note,
+            index=index,
+            total=total,
+        )
+    )
 
 
 @tool
@@ -38,6 +59,8 @@ def generate_dbt_project(
             - sql: The complete SQL for the model using ref() refs
             - materialized: Optional materialization strategy ("table" or "view")
     """
+    _emit_progress(f"generating dbt project {project_name}")
+
     base_dir = output_dir or os.path.join(os.getcwd(), "dbt_output", project_name)
 
     # Create directory structure
@@ -50,6 +73,8 @@ def generate_dbt_project(
         os.makedirs(d, exist_ok=True)
 
     created_files = []
+    total_models = len(staging_models) + len(mart_models)
+    _emit_progress(f"scaffolding {total_models} models", total=total_models)
 
     # 1. dbt_project.yml
     dbt_project = textwrap.dedent(f"""\
