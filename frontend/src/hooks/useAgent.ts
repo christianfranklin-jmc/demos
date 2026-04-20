@@ -20,6 +20,7 @@ import { useEffect, useRef } from "react";
 import { useAppState } from "../context/AppContext";
 import { useAgentDemo } from "./useAgent.demo";
 import { STEP_NUMBER_TO_ID } from "../lib/types";
+import { STEP_OPENERS } from "../data/step-openers";
 import type {
   SSEEventV1,
   StepId,
@@ -66,6 +67,30 @@ export function useAgent(): void {
 
   const inFlightRef = useRef<RunStepController | null>(null);
   const lastSentIndexRef = useRef<number>(-1);
+
+  // Live-mode opener: when the user enters a step with no messages, inject
+  // a greeting + suggested replies so they have a starting point without
+  // having to type their own prompt cold. Matches DSA's demo-engine pattern.
+  useEffect(() => {
+    if (state.demoMode.enabled) return; // demo engine owns openers in that mode
+    const step = state.lifecycle.current_step;
+    const opener = STEP_OPENERS[step];
+    if (!opener) return;
+    const stepMessages = state.conversation.filter((m) => m.step === step);
+    if (stepMessages.length > 0) return;
+    dispatch({
+      type: "ADD_MESSAGE",
+      message: {
+        data_product_id: state.lifecycle.data_product_id,
+        step,
+        message_role: "agent",
+        message_text: opener.greeting,
+        suggested_replies: opener.suggestions,
+        timestamp: new Date().toISOString(),
+      } as any,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.lifecycle.current_step, state.demoMode.enabled]);
 
   useEffect(() => {
     if (state.demoMode.enabled) return; // demo engine owns message dispatch
