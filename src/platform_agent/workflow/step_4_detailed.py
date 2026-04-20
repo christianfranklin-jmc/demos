@@ -66,7 +66,7 @@ async def run(
             source_database=request.connection.database,
             source_schema=request.connection.schema or "public",
             source_tables=source_tables[:10],
-            staging_models=[_staging_model(t) for t in source_tables[:10]],
+            staging_models=[_staging_model(t, request.connection.database) for t in source_tables[:10]],
             mart_models=[],
             output_dir=output_dir,
         )
@@ -119,12 +119,21 @@ def _project_name_for(connection: "SourceConnection") -> str:
     return f"{db}_dw"
 
 
-def _staging_model(table_name: str) -> dict:
-    """Minimal staging model spec accepted by generate_dbt_project."""
+def _staging_model(table_name: str, source_db: str) -> dict:
+    """Minimal staging model spec accepted by generate_dbt_project.
+
+    generate_dbt_project expects each staging entry to carry {name, sql}. The
+    SQL body is a thin pass-through over the source table so the generated
+    project compiles cleanly with no extra columns to model. Real customer
+    work replaces this with column-level casts + renames per Kimball staging.
+    """
     return {
         "name": f"stg_{table_name}",
-        "source_name": "raw",
-        "source_table": table_name,
+        "sql": (
+            "-- Auto-generated staging model. Passes source rows through with minimal\n"
+            "-- transformation; extend with explicit casts / renames per the logical model.\n"
+            f"select *\nfrom {{{{ source('{source_db}', '{table_name}') }}}}\n"
+        ),
     }
 
 
