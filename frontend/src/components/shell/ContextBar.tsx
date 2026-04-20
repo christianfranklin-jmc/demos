@@ -1,5 +1,6 @@
 import { useAppState } from "../../context/AppContext";
 import { useTheme } from "../../context/ThemeContext";
+import { disableDemoMode, enableDemoMode } from "../../lib/demoMode";
 import StatusPill from "../shared/StatusPill";
 
 // Constitution Article V: "Backend mode MUST be visible."
@@ -8,8 +9,13 @@ const BACKEND_MODE: "local" | "deployed" =
   ((import.meta as any).env?.VITE_BACKEND_MODE as "local" | "deployed") ?? "local";
 
 export default function ContextBar() {
-  const { state } = useAppState();
+  const { state, dispatch } = useAppState();
   const { theme } = useTheme();
+
+  const toggleDemo = () => {
+    if (state.demoMode.enabled) disableDemoMode(dispatch);
+    else enableDemoMode(dispatch, "user_toggle");
+  };
 
   const stepLabels: Record<number, string> = {
     0: theme.steps.step0Label,
@@ -48,7 +54,22 @@ export default function ContextBar() {
           <BackendModeBadge mode={BACKEND_MODE} />
           {state.demoMode.enabled && <DemoModeBadge />}
         </div>
-        <StatusPill status={status} />
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={toggleDemo}
+            className="text-[11px] rounded px-2 py-0.5"
+            style={{
+              background: state.demoMode.enabled ? theme.colors.accentSurface : "transparent",
+              color: state.demoMode.enabled ? theme.colors.accent : theme.colors.textSecondary,
+              border: `1px solid ${theme.colors.borderSubtle}`,
+            }}
+            title="Switch between live backend and pre-scripted demo content"
+          >
+            {state.demoMode.enabled ? "Demo mode ON" : "Demo mode OFF"}
+          </button>
+          <StatusPill status={status} />
+        </div>
       </div>
       {memoryUnreachable && (
         <div

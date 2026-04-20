@@ -167,7 +167,10 @@ export function runStep(
       if (abortCtl.signal.aborted) return;
       const message = err instanceof Error ? err.message : String(err);
       console.error("runStep error:", message);
-      // TODO(T064): offer "Continue in demo mode" affordance on error.
+      // T064: auto-fallback to demo mode so the demo keeps moving even when
+      // the backend is unreachable. The DEMO_MODE_AUTO_ENABLE reducer action
+      // stamps the reason so the UI can distinguish it from a user toggle.
+      ctx.dispatch({ type: "DEMO_MODE_AUTO_ENABLE" });
     } finally {
       silence?.dispose();
       ctx.dispatch({ type: "SET_AGENT_THINKING", thinking: false });

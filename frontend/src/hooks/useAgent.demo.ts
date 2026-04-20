@@ -470,6 +470,7 @@ export function useAgentDemo() {
 
   // Send opening message for current step
   useEffect(() => {
+    if (!state.demoMode.enabled) return; // live mode owns message dispatch
     const flow = getStepFlow(currentStep);
     if (!flow) return;
     if (hasInitializedRef.current) return;
@@ -501,6 +502,7 @@ export function useAgentDemo() {
   const lastMessageRef = useRef<string | null>(null);
 
   useEffect(() => {
+    if (!state.demoMode.enabled) return; // live mode owns message dispatch
     const flow = getStepFlow(currentStep);
     if (!flow) return;
     if (!lastMessage) return;

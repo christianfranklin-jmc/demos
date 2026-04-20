@@ -150,17 +150,17 @@ description: "Dependency-ordered task list for 001-dsa-agent-integration"
 
 ### Integration Tests
 
-- [ ] T050 [P] [US2] Create `/Users/mwebb/Projects/dsa-platform/tests/integration/test_step_1_snowflake.py`: connect to Pinnacle (env-gated — skip if `SF_ACCOUNT` unset), assert PRD cites `ANALYTICS.DIM_*` and `ANALYTICS.FCT_*` tables.
-- [ ] T051 [P] [US2] Create `/Users/mwebb/Projects/dsa-platform/tests/integration/test_step_1_redshift.py`: connect to bootstrapped Redshift Northwinds replica, assert PRD + Step 4 zip produces a `dbt-redshift` profile in the generated `profiles.yml`.
-- [ ] T052 [P] [US2] Create `/Users/mwebb/Projects/dsa-platform/tests/integration/test_source_switch.py`: connect to PostgreSQL, approve Step 1, switch to Snowflake mid-session; assert (a) confirmation modal, (b) post-confirmation artifacts are cleared, (c) workflow restarts at Step 1 with Snowflake context.
+- [X] T050 [P] [US2] Create `/Users/mwebb/Projects/dsa-platform/tests/integration/test_step_1_snowflake.py`: connect to Pinnacle (env-gated — skip if `SF_ACCOUNT` unset), assert PRD cites `ANALYTICS.DIM_*` and `ANALYTICS.FCT_*` tables.
+- [X] T051 [P] [US2] Create `/Users/mwebb/Projects/dsa-platform/tests/integration/test_step_1_redshift.py`: connect to bootstrapped Redshift Northwinds replica, assert PRD + Step 4 zip produces a `dbt-redshift` profile in the generated `profiles.yml`.
+- [X] T052 [P] [US2] Create `/Users/mwebb/Projects/dsa-platform/tests/integration/test_source_switch.py`: connect to PostgreSQL, approve Step 1, switch to Snowflake mid-session; assert (a) confirmation modal, (b) post-confirmation artifacts are cleared, (c) workflow restarts at Step 1 with Snowflake context.
 
 ### Implementation
 
-- [ ] T053 [US2] Extend sidebar form in `/Users/mwebb/Projects/dsa-platform/frontend/src/components/shell/Sidebar.tsx` with Snowflake driver fields (account, role, warehouse, database, schema) and a "Sign in via SSO" button that triggers the externalbrowser flow on the backend.
-- [ ] T054 [US2] Extend sidebar form with Redshift driver fields (workgroup host, port 5439, db, user, password).
-- [ ] T055 [US2] Wire backend `SourceConnection.credential.kind == "sso_externalbrowser"` in `/Users/mwebb/Projects/dsa-platform/src/platform_agent/api/routes_workflow.py` so the existing `SnowflakeDriver` can spawn the Okta/SAML browser; the frontend shows a "Waiting for SSO…" modal and resumes on success.
+- [X] T053 [US2] Extend sidebar form in `/Users/mwebb/Projects/dsa-platform/frontend/src/components/shell/Sidebar.tsx` with Snowflake driver fields (account, role, warehouse, database, schema) and a "Sign in via SSO" button that triggers the externalbrowser flow on the backend.
+- [X] T054 [US2] Extend sidebar form with Redshift driver fields (workgroup host, port 5439, db, user, password).
+- [X] T055 [US2] Wire backend `SourceConnection.credential.kind == "sso_externalbrowser"` in `/Users/mwebb/Projects/dsa-platform/src/platform_agent/api/routes_workflow.py` so the existing `SnowflakeDriver` can spawn the Okta/SAML browser; the frontend shows a "Waiting for SSO…" modal and resumes on success.
 - [ ] T056 [US2] Add connection-switch logic to `/Users/mwebb/Projects/dsa-platform/frontend/src/context/AppContext.tsx`: on `CONNECTION_SET` where the driver_type differs from prior, open a confirm modal; on confirm, dispatch `WORKFLOW_RESET` and clear all step artifacts. Honors FR-028.
-- [ ] T057 [US2] Ensure `/Users/mwebb/Projects/dsa-platform/src/platform_agent/workflow/step_2_conceptual.py` Snowflake branch uses naming-heuristic FK inference with `inferred=True` per data-model.md §4; UI renders inferred edges as dashed lines in `ConceptualERD.tsx`.
+- [X] T057 [US2] Ensure `/Users/mwebb/Projects/dsa-platform/src/platform_agent/workflow/step_2_conceptual.py` Snowflake branch uses naming-heuristic FK inference with `inferred=True` per data-model.md §4; UI renders inferred edges as dashed lines in `ConceptualERD.tsx`.
 - [ ] T058 [US2] Run quickstart steps 3–6 against Snowflake and Redshift; capture any adapter-specific issues as follow-up Polish tasks.
 
 **Checkpoint**: User Stories 1 and 2 both work end-to-end. Integration tests T050–T052 pass (or skip cleanly on missing env).
@@ -179,11 +179,11 @@ description: "Dependency-ordered task list for 001-dsa-agent-integration"
 
 ### Implementation
 
-- [ ] T060 [P] [US3] Create `/Users/mwebb/Projects/dsa-platform/frontend/src/lib/demoMode.ts` exporting `resolveStep(stepId: StepId, userMessage: string, priorArtifacts: PriorArtifact[] | null): DemoModeResponse` that synthesises responses from `frontend/src/data/mock/` datasets (Atlan, Snowflake, Highspot, data-products). Responses mimic the same event shapes the live backend would emit (so the useAgent renderer is unchanged).
+- [X] T060 [P] [US3] Create `/Users/mwebb/Projects/dsa-platform/frontend/src/lib/demoMode.ts` exporting `resolveStep(stepId: StepId, userMessage: string, priorArtifacts: PriorArtifact[] | null): DemoModeResponse` that synthesises responses from `frontend/src/data/mock/` datasets (Atlan, Snowflake, Highspot, data-products). Responses mimic the same event shapes the live backend would emit (so the useAgent renderer is unchanged).
 - [ ] T061 [P] [US3] Create `/Users/mwebb/Projects/dsa-platform/frontend/src/components/shared/DemoBadge.tsx` — a fixed-position corner pill reading "DEMO" in phData orange `#F97316` with high contrast; props control which corner of the containing artifact panel.
-- [ ] T062 [US3] Add demo-mode toggle to `/Users/mwebb/Projects/dsa-platform/frontend/src/components/shell/ContextBar.tsx`; bind to `DEMO_MODE_ENABLE`/`DEMO_MODE_DISABLE` actions on `AppContext`.
-- [ ] T063 [US3] Short-circuit `/Users/mwebb/Projects/dsa-platform/frontend/src/hooks/useAgent.ts` `runStep` when `appState.demoMode.enabled`: invoke `demoMode.resolveStep` and feed results into the same reducer actions that live events use; never call the backend.
-- [ ] T064 [US3] Extend the error boundary inside `/Users/mwebb/Projects/dsa-platform/frontend/src/hooks/useAgent.ts`: when a live backend call fails, surface an inline "Continue this step in demo mode" button; on click, dispatch `DEMO_MODE_AUTO_ENABLE` and retry the step from `demoMode.resolveStep`.
+- [X] T062 [US3] Add demo-mode toggle to `/Users/mwebb/Projects/dsa-platform/frontend/src/components/shell/ContextBar.tsx`; bind to `DEMO_MODE_ENABLE`/`DEMO_MODE_DISABLE` actions on `AppContext`.
+- [X] T063 [US3] Short-circuit `/Users/mwebb/Projects/dsa-platform/frontend/src/hooks/useAgent.ts` `runStep` when `appState.demoMode.enabled`: invoke `demoMode.resolveStep` and feed results into the same reducer actions that live events use; never call the backend.
+- [X] T064 [US3] Extend the error boundary inside `/Users/mwebb/Projects/dsa-platform/frontend/src/hooks/useAgent.ts`: when a live backend call fails, surface an inline "Continue this step in demo mode" button; on click, dispatch `DEMO_MODE_AUTO_ENABLE` and retry the step from `demoMode.resolveStep`.
 - [ ] T065 [US3] Render `<DemoBadge>` in every artifact panel (`PRDView.tsx`, `ConceptualERD.tsx`, `LogicalModel.tsx`, `DetailedRequirements.tsx`) conditional on `appState.demoMode.enabled`.
 - [ ] T066 [US3] Run quickstart step 7 manually; record the demo-mode walkthrough as a canned demo moment per Constitution Article VIII.
 

@@ -370,9 +370,11 @@ function appReducer(state: AppState, action: AppAction): AppState {
 
 // ─── Context ───
 
+export type AppDispatch = React.Dispatch<AppAction>;
+
 interface AppContextType {
   state: AppState;
-  dispatch: React.Dispatch<AppAction>;
+  dispatch: AppDispatch;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
