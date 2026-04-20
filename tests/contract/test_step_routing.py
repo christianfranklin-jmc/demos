@@ -23,7 +23,9 @@ from platform_agent.api.app import app
 
 @pytest.fixture
 def client():
-    return TestClient(app)
+    # Context-manager form ensures the lifespan (artifact_store sweeper) runs.
+    with TestClient(app) as c:
+        yield c
 
 
 def test_health_is_live(client):
@@ -34,9 +36,8 @@ def test_health_is_live(client):
     assert body["mode"] in ("local", "deployed")
 
 
-@pytest.mark.skip(reason="T035: routes_workflow.py not yet implemented — router returns 404")
 def test_missing_connection_returns_400(client):
-    """Once T035 lands, Step 1 without a connection must 400 citing 'connection'."""
+    """Step 1 requires a DB connection (FR-005). Omitting it returns 400."""
     sid = str(uuid4())
     r = client.post(
         "/workflow/step",
@@ -55,6 +56,63 @@ def test_missing_connection_returns_400(client):
     )
     assert r.status_code == 400
     assert "connection" in r.text.lower()
+
+
+def test_invalid_step_id_returns_422(client):
+    """Unknown step_id is a Pydantic validation error → 422."""
+    sid = str(uuid4())
+    r = client.post(
+        "/workflow/step",
+        headers={
+            "X-DSA-Session-ID": sid,
+            "Content-Type": "application/json",
+            "Accept": "text/event-stream",
+        },
+        json={
+            "step_id": "not-a-step",
+            "user_message": "hi",
+            "prior_artifact": None,
+            "connection": None,
+            "resume": False,
+        },
+    )
+    assert r.status_code == 422
+
+
+def test_missing_session_header_returns_400(client):
+    r = client.post(
+        "/workflow/step",
+        headers={"Content-Type": "application/json", "Accept": "text/event-stream"},
+        json={
+            "step_id": "requirements",
+            "user_message": "hi",
+            "prior_artifact": None,
+            "connection": None,
+            "resume": False,
+        },
+    )
+    assert r.status_code == 400
+    assert "X-DSA-Session-ID" in r.json()["detail"]
+
+
+def test_artifact_download_unknown_handle_returns_404(client):
+    sid = str(uuid4())
+    r = client.get(
+        f"/workflow/artifact/{uuid4()}",
+        headers={"X-DSA-Session-ID": sid},
+    )
+    assert r.status_code == 404
+
+
+def test_cancel_unknown_run_returns_cancelled_false(client):
+    sid = str(uuid4())
+    r = client.post(
+        "/workflow/cancel",
+        headers={"X-DSA-Session-ID": sid, "Content-Type": "application/json"},
+        json={"session_id": sid, "run_id": str(uuid4())},
+    )
+    assert r.status_code == 200
+    assert r.json() == {"cancelled": False}
 
 
 @pytest.mark.skip(reason="T035: routes_workflow.py not yet implemented")

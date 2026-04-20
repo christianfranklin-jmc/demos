@@ -18,6 +18,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .routes_health import router as health_router
+from .routes_workflow import router as workflow_router
 from .zip_stream import ArtifactStore
 
 logger = logging.getLogger(__name__)
@@ -56,7 +57,7 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(health_router)
-    # /workflow/* routes register in T035 once routes_workflow.py exists.
+    app.include_router(workflow_router)
 
     return app
 

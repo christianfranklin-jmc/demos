@@ -1,27 +1,139 @@
 """Step 1 (Requirements / PRD) handler.
 
-Stub — body lands in T036. Signature is stable now so the router in
-T035 can import and dispatch without waiting for the implementation.
+Connects to the source database, scans metadata, and emits a PRD grounded in
+the real tables discovered. This implementation is schema-driven (not LLM-
+driven) to keep the MVP deterministic for integration tests. Later iterations
+can layer a Strands agent call on top to enrich the prose.
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
+from uuid import UUID, uuid4
+
+from ..api.events import (
+    ArtifactUpdateEvent,
+    DoneEvent,
+    PrdPayload,
+    PrdSection,
+    ToolResultEvent,
+    ToolStartEvent,
+)
+from ._shared import (
+    ensure_driver,
+    scan_metadata_safe,
+    short_summary,
+    source_id_for,
+)
 
 if TYPE_CHECKING:
     from ..api.deps import SessionContext
     from ..api.sse import SSEEmitter
-    from .requests import StepRequest  # to be created in T035
+    from ..api.routes_workflow import StepRequest
+    from ..api.zip_stream import ArtifactStore
 
 
 async def run(
     request: "StepRequest",
     session: "SessionContext",
     emitter: "SSEEmitter",
+    run_id: UUID,
+    artifact_store: "ArtifactStore",
 ) -> None:
-    """Run Step 1 against the connected database.
+    assert request.connection is not None, "step 1 requires a connection"
+    source_id = source_id_for(session, request.connection)
 
-    Produces `artifact_update.prd` events grounded in `scan_metadata` output,
-    then emits `done` on gate-worthy completion.
-    """
-    raise NotImplementedError("T036 lands the Step 1 body")
+    emitter.emit(
+        ToolStartEvent(
+            run_id=run_id,
+            tool="connect_to_database",
+            args_summary=f"driver={request.connection.driver_type}",
+        )
+    )
+    ensure_driver(source_id, request.connection)
+    emitter.emit(
+        ToolResultEvent(
+            run_id=run_id, tool="connect_to_database", summary=f"connected to {source_id}"
+        )
+    )
+
+    emitter.emit(
+        ToolStartEvent(run_id=run_id, tool="scan_metadata", args_summary=f"source={source_id}")
+    )
+    metadata = scan_metadata_safe(source_id)
+    tables = metadata.get("tables", []) if isinstance(metadata, dict) else []
+    emitter.emit(
+        ToolResultEvent(
+            run_id=run_id,
+            tool="scan_metadata",
+            summary=f"Found {len(tables)} tables",
+        )
+    )
+
+    payload = _build_prd(request.user_message, tables, request.connection.schema)
+    emitter.emit(
+        ArtifactUpdateEvent(
+            run_id=run_id,
+            step="requirements",
+            artifact_type="prd",
+            payload=payload,
+        )
+    )
+    emitter.emit(DoneEvent(run_id=run_id, step="requirements"))
+
+
+def _build_prd(user_message: str, tables: list[dict[str, Any]], schema: str | None) -> PrdPayload:
+    """Assemble a PRD that cites real tables discovered by scan_metadata."""
+    schema_prefix = f"{schema}." if schema else ""
+    table_refs = [f"{schema_prefix}{t.get('name', t.get('table_name', ''))}" for t in tables]
+    table_refs = [ref for ref in table_refs if ref.strip(".")]
+    cited = table_refs[:6]  # keep the PRD tight; cite the top-N entity-shaped tables
+
+    sections: list[PrdSection] = []
+    sections.append(
+        PrdSection(
+            heading="Problem Statement",
+            body=short_summary(user_message, 400),
+            cited_tables=cited,
+            completeness_contribution=0.20,
+        )
+    )
+    sections.append(
+        PrdSection(
+            heading="Discovered Source Entities",
+            body=(
+                f"Scan of the connected source discovered {len(tables)} tables. "
+                f"The candidate entity set for the data product is: "
+                + ", ".join(f"`{t}`" for t in cited)
+                + "."
+            ),
+            cited_tables=cited,
+            completeness_contribution=0.30,
+        )
+    )
+    sections.append(
+        PrdSection(
+            heading="Proposed Goals",
+            body=(
+                "Deliver a governed analytical data product atop the discovered source entities, "
+                "with a Kimball-style star schema, dbt transformations, and a semantic layer for "
+                "downstream BI."
+            ),
+            cited_tables=cited,
+            completeness_contribution=0.25,
+        )
+    )
+    sections.append(
+        PrdSection(
+            heading="Out of Scope",
+            body=(
+                "Operational source-system changes. Data capture layer. Real-time ingestion. "
+                "User authentication for downstream consumers."
+            ),
+            cited_tables=[],
+            completeness_contribution=0.0,
+        )
+    )
+
+    completeness = min(1.0, sum(s.completeness_contribution for s in sections))
+    return PrdPayload(sections=sections, completeness=completeness)
