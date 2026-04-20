@@ -32,9 +32,9 @@ description: "Dependency-ordered task list for 001-dsa-agent-integration"
 
 **Purpose**: Declare new dependencies and environment variables before any code lands.
 
-- [ ] T001 Add `fastapi`, `uvicorn[standard]`, and `aiofiles` to `[project.dependencies]` in `/Users/mwebb/Projects/dsa-platform/pyproject.toml`; run `uv lock` to refresh `uv.lock`.
-- [ ] T002 [P] Append new env vars (`API_PORT`, `SESSION_HEADER_NAME=X-DSA-Session-ID`, `CORS_ALLOWED_ORIGINS`, `AGENT_MODE=local|deployed`) to `/Users/mwebb/Projects/dsa-platform/.env.example`.
-- [ ] T003 [P] Update `/Users/mwebb/Projects/dsa-platform/docker/docker-compose.yml` so the backend service launches `uvicorn platform_agent.api.app:app --host 0.0.0.0 --port 8080` and the frontend service runs `npm run dev -- --host 0.0.0.0` with `VITE_BACKEND_URL=http://backend:8080` bound to a host port.
+- [X] T001 Add `fastapi`, `uvicorn[standard]`, and `aiofiles` to `[project.dependencies]` in `/Users/mwebb/Projects/dsa-platform/pyproject.toml`; run `uv lock` to refresh `uv.lock`.
+- [X] T002 [P] Append new env vars (`API_PORT`, `SESSION_HEADER_NAME=X-DSA-Session-ID`, `CORS_ALLOWED_ORIGINS`, `AGENT_MODE=local|deployed`) to `/Users/mwebb/Projects/dsa-platform/.env.example`.
+- [X] T003 [P] Update `/Users/mwebb/Projects/dsa-platform/docker/docker-compose.yml` so the backend service launches `uvicorn platform_agent.api.app:app --host 0.0.0.0 --port 8080` and the frontend service runs `npm run dev -- --host 0.0.0.0` with `VITE_BACKEND_URL=http://backend:8080` bound to a host port.
 
 ---
 

@@ -10,6 +10,7 @@ services:
     build:
       context: ..
       dockerfile: patterns/platform-agent/Dockerfile
+    command: ["uvicorn", "platform_agent.api.app:app", "--host", "0.0.0.0", "--port", "8080"]
     ports:
       - "8080:8080"
     environment:
@@ -27,8 +28,14 @@ services:
       - DB_USER=${DB_USER:-}
       - DB_PASSWORD=${DB_PASSWORD:-}
       - DB_DRIVER_TYPE=${DB_DRIVER_TYPE:-postgresql}
+      # 001-dsa-agent-integration
+      - API_PORT=${API_PORT:-8080}
+      - SESSION_HEADER_NAME=${SESSION_HEADER_NAME:-X-DSA-Session-ID}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
+      - AGENT_MODE=${AGENT_MODE:-local}
+      - BUILD_SHA=${BUILD_SHA:-dev}
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/ping"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -37,10 +44,12 @@ services:
     build:
       context: ../frontend
       dockerfile: Dockerfile
+    command: ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]
     ports:
-      - "3000:3000"
+      - "5173:5173"
     environment:
-      - VITE_AGENT_URL=http://agent:8080
+      - VITE_BACKEND_URL=http://agent:8080
+      - VITE_BACKEND_MODE=${AGENT_MODE:-local}
       - VITE_COGNITO_POOL_ID=${COGNITO_POOL_ID:-}
       - VITE_COGNITO_CLIENT_ID=${COGNITO_CLIENT_ID:-}
     depends_on:
