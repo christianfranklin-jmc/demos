@@ -204,7 +204,12 @@ def generate_dbt_project(
                   - unique
                   - not_null"""))
 
-    schema_yml = "version: 2\n\nmodels:\n" + "\n".join(mart_entries) + "\n"
+    # When there are no mart models, emit an empty-but-valid schema.yml.
+    # dbt rejects `models:` with a null body — the value must be an empty list.
+    if mart_entries:
+        schema_yml = "version: 2\n\nmodels:\n" + "\n".join(mart_entries) + "\n"
+    else:
+        schema_yml = "version: 2\nmodels: []\n"
     _write_file(os.path.join(base_dir, "models", "marts"), "schema.yml", schema_yml, created_files)
 
     return {
