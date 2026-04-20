@@ -399,8 +399,11 @@ else
     echo "Reusing namespace: $RS_NAMESPACE (status: $RS_NS_STATUS)"
 fi
 
-# Check if workgroup exists
-RS_WG_STATUS=$($AWS redshift-serverless describe-workgroup \
+# Check if workgroup exists. Note: the subcommand is `get-workgroup`
+# (not `describe-workgroup`, which does not exist in the redshift-serverless
+# service and silently fails, leading to a spurious create attempt that
+# then trips ConflictException).
+RS_WG_STATUS=$($AWS redshift-serverless get-workgroup \
     --workgroup-name "$RS_WORKGROUP" \
     --query 'workgroup.status' --output text 2>/dev/null || echo "not-found")
 
