@@ -455,14 +455,37 @@ export interface SSEMessage {
   delta: boolean;
 }
 
+export interface BackendDetailedField {
+  target_field: string;
+  data_type: string;
+  source_field: string | null;
+}
+
+export interface BackendDetailedTable {
+  table_name: string;
+  grain: string | null;
+  fields: BackendDetailedField[];
+}
+
+export interface DetailedRequirementsPayload {
+  fact_table: BackendDetailedTable | null;
+  dimension_tables: BackendDetailedTable[];
+  staging_models: string[];
+  file_count: number;
+}
+
 export interface SSEArtifactUpdate {
   event: "artifact_update";
   v: 1;
   t: string;
   run_id: string;
   step: StepId;
-  artifact_type: "prd" | "conceptual_model" | "logical_model";
-  payload: PrdPayload | ConceptualModelPayload | LogicalModelPayload;
+  artifact_type: "prd" | "conceptual_model" | "logical_model" | "detailed_requirements";
+  payload:
+    | PrdPayload
+    | ConceptualModelPayload
+    | LogicalModelPayload
+    | DetailedRequirementsPayload;
 }
 
 export interface SSEArtifactReady {

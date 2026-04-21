@@ -143,7 +143,39 @@ class LogicalModelPayload(BaseModel):
     tables: list[LogicalTable]
 
 
-ArtifactPayload = PrdPayload | ConceptualModelPayload | LogicalModelPayload
+class DetailedField(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    target_field: str
+    data_type: str
+    source_field: str | None = None
+
+
+class DetailedTable(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    table_name: str
+    grain: str | None = None
+    fields: list[DetailedField]
+
+
+class DetailedRequirementsPayload(BaseModel):
+    """Step 4 detailed-requirements preview — reflects the generated dbt project."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    fact_table: DetailedTable | None = None
+    dimension_tables: list[DetailedTable] = Field(default_factory=list)
+    staging_models: list[str] = Field(default_factory=list)
+    file_count: int = 0
+
+
+ArtifactPayload = (
+    PrdPayload
+    | ConceptualModelPayload
+    | LogicalModelPayload
+    | DetailedRequirementsPayload
+)
 
 
 class ArtifactUpdateEvent(_EventBase):
@@ -154,7 +186,7 @@ class ArtifactUpdateEvent(_EventBase):
 
     run_id: UUID
     step: Literal["requirements", "conceptual", "logical", "detailed"]
-    artifact_type: Literal["prd", "conceptual_model", "logical_model"]
+    artifact_type: Literal["prd", "conceptual_model", "logical_model", "detailed_requirements"]
     payload: ArtifactPayload
 
 

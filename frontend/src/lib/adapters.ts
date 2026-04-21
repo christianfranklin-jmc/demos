@@ -11,10 +11,13 @@ import type {
   PrdPayload as BackendPrd,
   ConceptualModelPayload as BackendConceptual,
   LogicalModelPayload as BackendLogical,
+  DetailedRequirementsPayload as BackendDetailed,
   BackendEntity,
   BackendRelationship,
   BackendLogicalTable,
   BackendLogicalField,
+  BackendDetailedTable,
+  BackendDetailedField,
   // DSA
   PRDArtifact,
   ConceptualModelArtifact,
@@ -24,6 +27,9 @@ import type {
   LogicalEntity,
   LogicalAttribute,
   EntityRole,
+  DetailedRequirementsArtifact,
+  DetailedField,
+  SourceSystem,
 } from "./types";
 
 // ─── PRD ───
@@ -41,18 +47,30 @@ export function prdFromBackend(payload: BackendPrd): Partial<PRDArtifact> {
         .filter(Boolean)
     : null;
 
-  // Map each DSA field to a distinct backend section so we don't duplicate
-  // the same text into multiple fields (which previously made the PRD look
-  // like it was being overwritten even after APPEND_PRD merged correctly).
-  //   Problem Statement → business_objective (accumulates user intent)
-  //   Proposed Goals    → success_criteria
-  //   Out of Scope      → scope_out list
-  // current_state_pain is left untouched — the backend doesn't synthesise a
-  // pain narrative, and duplicating the user's goal into "pain" was wrong.
+  // Harvest cited tables for richer auto-fill so the PRD panel doesn't look
+  // almost-empty. We derive scope_in + source_systems from the real schemas
+  // observed across all sections.
+  const cited = Array.from(
+    new Set(payload.sections.flatMap((s) => s.cited_tables)),
+  );
+  const scopeIn = cited.length ? cited : null;
+  const sourceSchemas = Array.from(
+    new Set(cited.map((t) => t.split(".")[0]).filter(Boolean)),
+  );
+  const sourceSystems: SourceSystem[] | null = sourceSchemas.length
+    ? sourceSchemas.map((s) => ({
+        system: s,
+        data_domain: "Sales & Operations",
+        access_confirmed: true,
+      }))
+    : null;
+
   return {
     business_objective: find("problem"),
     success_criteria: find("goal") ?? find("success"),
+    scope_in: scopeIn,
     scope_out: scopeOutList,
+    source_systems: sourceSystems,
     completeness_score: Math.round(payload.completeness * 100),
   };
 }
@@ -145,4 +163,59 @@ export function logicalFromBackend(payload: BackendLogical): LogicalModelArtifac
     attributes: t.fields.map(mapLogicalField),
   }));
   return { entities, flags: [] };
+}
+
+// ─── Detailed Requirements (Step 4) ───
+
+function backendDetailedFieldToDsa(
+  f: BackendDetailedField,
+): DetailedField {
+  return {
+    target_field: f.target_field,
+    data_type: normalizeType(f.data_type),
+    source_system: "northwinds",
+    source_field: f.source_field ?? f.target_field,
+    transformation: "pass-through",
+    business_rule: "",
+    required: true,
+    governance: "Public",
+    phase: "MVP",
+  };
+}
+
+function backendDetailedTableToDsaFact(t: BackendDetailedTable): {
+  table_name: string;
+  grain: string;
+  fields: DetailedField[];
+} {
+  return {
+    table_name: t.table_name,
+    grain: t.grain ?? "one row per record",
+    fields: t.fields.map(backendDetailedFieldToDsa),
+  };
+}
+
+function backendDetailedTableToDsaDim(t: BackendDetailedTable): {
+  table_name: string;
+  fields: DetailedField[];
+} {
+  return {
+    table_name: t.table_name,
+    fields: t.fields.map(backendDetailedFieldToDsa),
+  };
+}
+
+export function detailedFromBackend(
+  payload: BackendDetailed,
+): DetailedRequirementsArtifact {
+  const fact = payload.fact_table
+    ? backendDetailedTableToDsaFact(payload.fact_table)
+    : { table_name: "(no fact identified)", grain: "—", fields: [] };
+  const dims = payload.dimension_tables.map(backendDetailedTableToDsaDim);
+  return {
+    fact_table: fact,
+    dimension_tables: dims,
+    calculated_metrics: [],
+    completeness_score: dims.length ? 70 : 40,
+  };
 }

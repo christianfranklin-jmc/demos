@@ -29,6 +29,7 @@ import type {
   PrdPayload,
   ConceptualModelPayload,
   LogicalModelPayload,
+  DetailedRequirementsPayload,
 } from "../lib/types";
 import {
   SilenceTimer,
@@ -36,6 +37,7 @@ import {
 } from "../lib/agentcore-client/parsers/v1";
 import {
   conceptualFromBackend,
+  detailedFromBackend,
   logicalFromBackend,
   prdFromBackend,
 } from "../lib/adapters";
@@ -266,6 +268,11 @@ function handleEvent(event: SSEEventV1, ctx: RunStepContext): void {
         ctx.dispatch({
           type: "SET_LOGICAL_MODEL",
           model: logicalFromBackend(event.payload as LogicalModelPayload),
+        });
+      } else if (event.artifact_type === "detailed_requirements") {
+        ctx.dispatch({
+          type: "SET_DETAILED_REQUIREMENTS",
+          model: detailedFromBackend(event.payload as DetailedRequirementsPayload),
         });
       }
       return;

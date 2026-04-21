@@ -15,7 +15,16 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from ..api.events import ArtifactReadyEvent, MessageEvent, ToolResultEvent, ToolStartEvent
+from ..api.events import (
+    ArtifactReadyEvent,
+    ArtifactUpdateEvent,
+    DetailedField,
+    DetailedRequirementsPayload,
+    DetailedTable,
+    MessageEvent,
+    ToolResultEvent,
+    ToolStartEvent,
+)
 from ._shared import ensure_driver, scan_metadata_safe, source_id_for
 
 if TYPE_CHECKING:
@@ -102,6 +111,18 @@ async def run(
     if ttl_seconds <= 0:  # clock skew paranoia
         ttl_seconds = 60
 
+    # Preview the dbt structure in the artifact panel so the user gets visible
+    # feedback beyond just the zip download — fact + dimension breakdown.
+    detailed_payload = _preview_from_metadata(raw_tables, request.connection.schema)
+    emitter.emit(
+        ArtifactUpdateEvent(
+            run_id=run_id,
+            step="detailed",
+            artifact_type="detailed_requirements",
+            payload=detailed_payload,
+        )
+    )
+
     emitter.emit(
         MessageEvent(
             run_id=run_id,
@@ -157,6 +178,57 @@ def _zip_directory(root: str) -> bytes:
             if path.is_file():
                 zf.write(path, arcname=str(path.relative_to(root_path.parent)))
     return buf.getvalue()
+
+
+def _preview_from_metadata(
+    raw_tables: list, schema: str | None
+) -> DetailedRequirementsPayload:
+    """Pick the largest entity as the fact table and the rest as dims, for preview."""
+    ranked = sorted(
+        raw_tables,
+        key=lambda t: -int(t.get("row_count") or 0),
+    )
+    if not ranked:
+        return DetailedRequirementsPayload()
+
+    def _fields(t: dict) -> list[DetailedField]:
+        out: list[DetailedField] = []
+        for col in (t.get("columns") or [])[:12]:
+            name = col.get("name") or col.get("column_name")
+            if not name:
+                continue
+            out.append(
+                DetailedField(
+                    target_field=name,
+                    data_type=col.get("data_type") or col.get("type") or "unknown",
+                    source_field=name,
+                )
+            )
+        return out
+
+    def _name(t: dict) -> str:
+        raw = t.get("name") or t.get("table_name") or ""
+        return f"{schema}.{raw}" if schema and raw else raw
+
+    fact = DetailedTable(
+        table_name=f"fct_{ranked[0].get('name') or ranked[0].get('table_name', 'fact')}",
+        grain=f"one row per {_name(ranked[0])} record",
+        fields=_fields(ranked[0]),
+    )
+    dims = [
+        DetailedTable(
+            table_name=f"dim_{t.get('name') or t.get('table_name', 'dim')}",
+            grain=None,
+            fields=_fields(t),
+        )
+        for t in ranked[1:6]
+    ]
+    return DetailedRequirementsPayload(
+        fact_table=fact,
+        dimension_tables=dims,
+        staging_models=[f"stg_{t.get('name') or t.get('table_name', '')}" for t in ranked[:10]],
+        file_count=0,  # set by caller if needed
+    )
 
 
 def _count_zip_entries(zip_bytes: bytes) -> int:
