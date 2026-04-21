@@ -80,15 +80,23 @@ async def run(
             payload=payload,
         )
     )
+    # Closing message varies with the user's intent so repeated turns don't
+    # produce identical-looking chat replies. First sentence echoes the user's
+    # prompt; second gives a quick count. Accumulated PRD content is visible
+    # in the right-hand panel via APPEND_PRD.
     cited = [t for s in payload.sections for t in s.cited_tables][:6]
+    prompt_preview = request.user_message.strip()
+    if len(prompt_preview) > 80:
+        prompt_preview = prompt_preview[:77] + "…"
     emitter.emit(
         MessageEvent(
             run_id=run_id,
             delta=False,
             content=(
-                f"Drafted a PRD grounded in {len(tables)} real source tables. "
-                f"Candidate entities cited: {', '.join(f'`{t}`' for t in cited) or 'none yet'}. "
-                "Refine with another prompt, or approve the gate to move to Step 2."
+                f"Captured **{prompt_preview}** into the PRD. "
+                f"Grounded in {len(tables)} source tables; "
+                f"top candidate entities: {', '.join(f'`{t}`' for t in cited) or 'none yet'}. "
+                "Pick another refinement or approve the gate to move to Step 2."
             ),
         )
     )
@@ -98,9 +106,27 @@ async def run(
 def _build_prd(user_message: str, tables: list[dict[str, Any]], schema: str | None) -> PrdPayload:
     """Assemble a PRD that cites real tables discovered by scan_metadata."""
     schema_prefix = f"{schema}." if schema else ""
-    table_refs = [f"{schema_prefix}{t.get('name', t.get('table_name', ''))}" for t in tables]
+
+    # Rank tables: entity-shaped (single-column PK + meaningful row count)
+    # first, junction tables and empty tables last. Biggest entities surface
+    # to the top so Orders / Customers / Products lead the citations rather
+    # than alphabetical noise like customer_customer_demo.
+    def rank(t: dict[str, Any]) -> tuple[int, int]:
+        pk = t.get("primary_keys") or t.get("primary_key") or []
+        if isinstance(pk, str):
+            pk = [pk]
+        junction_penalty = 1 if len(pk) >= 2 else 0  # junction → sort down
+        rows = int(t.get("row_count") or 0)
+        # Sort ascending on (junction_penalty, -rows) → junctions last, big rows first
+        return (junction_penalty, -rows)
+
+    ranked = sorted(tables, key=rank)
+    table_refs = [
+        f"{schema_prefix}{t.get('name', t.get('table_name', ''))}"
+        for t in ranked
+    ]
     table_refs = [ref for ref in table_refs if ref.strip(".")]
-    cited = table_refs[:6]  # keep the PRD tight; cite the top-N entity-shaped tables
+    cited = table_refs[:6]
 
     sections: list[PrdSection] = []
     sections.append(
