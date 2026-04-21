@@ -272,10 +272,15 @@ function handleEvent(event: SSEEventV1, ctx: RunStepContext): void {
 
     case "artifact_ready":
       void triggerZipDownload(event.download_url, ctx.sessionId);
+      // Step 4 terminal — same gate-activation behavior as `done`.
+      ctx.dispatch({ type: "SET_GATE_ACTIVE", active: true });
       return;
 
     case "done":
-      // Step completed; terminal. The silence timer is disposed by the loop.
+      // Step complete → activate the human gate so the user can approve
+      // and advance. Without this dispatch the gate banner never shows in
+      // live mode and the user feels stuck.
+      ctx.dispatch({ type: "SET_GATE_ACTIVE", active: true });
       return;
 
     case "error":

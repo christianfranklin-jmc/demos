@@ -41,9 +41,16 @@ export function prdFromBackend(payload: BackendPrd): Partial<PRDArtifact> {
         .filter(Boolean)
     : null;
 
+  // Map each DSA field to a distinct backend section so we don't duplicate
+  // the same text into multiple fields (which previously made the PRD look
+  // like it was being overwritten even after APPEND_PRD merged correctly).
+  //   Problem Statement → business_objective (accumulates user intent)
+  //   Proposed Goals    → success_criteria
+  //   Out of Scope      → scope_out list
+  // current_state_pain is left untouched — the backend doesn't synthesise a
+  // pain narrative, and duplicating the user's goal into "pain" was wrong.
   return {
-    business_objective: find("problem") ?? find("goal"),
-    current_state_pain: find("problem") ?? find("current state"),
+    business_objective: find("problem"),
     success_criteria: find("goal") ?? find("success"),
     scope_out: scopeOutList,
     completeness_score: Math.round(payload.completeness * 100),
