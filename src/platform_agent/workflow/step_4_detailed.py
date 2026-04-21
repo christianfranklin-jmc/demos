@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from ..api.events import ArtifactReadyEvent, ToolResultEvent, ToolStartEvent
+from ..api.events import ArtifactReadyEvent, MessageEvent, ToolResultEvent, ToolStartEvent
 from ._shared import ensure_driver, scan_metadata_safe, source_id_for
 
 if TYPE_CHECKING:
@@ -102,6 +102,18 @@ async def run(
     if ttl_seconds <= 0:  # clock skew paranoia
         ttl_seconds = 60
 
+    emitter.emit(
+        MessageEvent(
+            run_id=run_id,
+            delta=False,
+            content=(
+                f"Generated a dbt project ({_count_zip_entries(zip_bytes)} files, "
+                f"{_human(len(zip_bytes))}) from {len(source_tables)} source table"
+                f"{'s' if len(source_tables) != 1 else ''}. "
+                "Downloading the zip now — unzip and run `dbt compile` to verify."
+            ),
+        )
+    )
     emitter.emit(
         ArtifactReadyEvent(
             run_id=run_id,

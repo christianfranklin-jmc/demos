@@ -14,6 +14,7 @@ from ..api.events import (
     ConceptualModelPayload,
     DoneEvent,
     Entity,
+    MessageEvent,
     Relationship,
     ToolResultEvent,
     ToolStartEvent,
@@ -69,6 +70,20 @@ async def run(
             step="conceptual",
             artifact_type="conceptual_model",
             payload=ConceptualModelPayload(entities=entities, relationships=relationships),
+        )
+    )
+    inferred = sum(1 for r in relationships if r.inferred)
+    declared = len(relationships) - inferred
+    emitter.emit(
+        MessageEvent(
+            run_id=run_id,
+            delta=False,
+            content=(
+                f"Mapped {len(entities)} entities and {len(relationships)} relationships "
+                f"({declared} declared FK" + ("s" if declared != 1 else "") +
+                (f", {inferred} inferred" if inferred else "") + "). "
+                "Check the ERD on the right, then approve to move to the logical model."
+            ),
         )
     )
     emitter.emit(DoneEvent(run_id=run_id, step="conceptual"))

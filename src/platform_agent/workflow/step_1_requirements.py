@@ -14,6 +14,7 @@ from uuid import UUID
 from ..api.events import (
     ArtifactUpdateEvent,
     DoneEvent,
+    MessageEvent,
     PrdPayload,
     PrdSection,
     ToolResultEvent,
@@ -77,6 +78,18 @@ async def run(
             step="requirements",
             artifact_type="prd",
             payload=payload,
+        )
+    )
+    cited = [t for s in payload.sections for t in s.cited_tables][:6]
+    emitter.emit(
+        MessageEvent(
+            run_id=run_id,
+            delta=False,
+            content=(
+                f"Drafted a PRD grounded in {len(tables)} real source tables. "
+                f"Candidate entities cited: {', '.join(f'`{t}`' for t in cited) or 'none yet'}. "
+                "Refine with another prompt, or approve the gate to move to Step 2."
+            ),
         )
     )
     emitter.emit(DoneEvent(run_id=run_id, step="requirements"))

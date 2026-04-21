@@ -16,6 +16,7 @@ from ..api.events import (
     LogicalField,
     LogicalModelPayload,
     LogicalTable,
+    MessageEvent,
     ToolResultEvent,
     ToolStartEvent,
 )
@@ -90,6 +91,18 @@ async def run(
             step="logical",
             artifact_type="logical_model",
             payload=LogicalModelPayload(tables=tables),
+        )
+    )
+    total_fields = sum(len(t.fields) for t in tables)
+    emitter.emit(
+        MessageEvent(
+            run_id=run_id,
+            delta=False,
+            content=(
+                f"Built {len(tables)} logical table{'s' if len(tables) != 1 else ''} "
+                f"with {total_fields} typed fields, sampled live from the source. "
+                "Review the types and sample values, then approve to generate dbt."
+            ),
         )
     )
     emitter.emit(DoneEvent(run_id=run_id, step="logical"))

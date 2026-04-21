@@ -112,6 +112,7 @@ export function useAgent(): void {
       sessionId: state.sessionId,
       connection: state.connection,
       dispatch,
+      currentStep: message.step,
     });
     currentController = inFlightRef.current;
 
@@ -135,6 +136,7 @@ interface RunStepContext {
   sessionId: string;
   connection: StepRequest["connection"];
   dispatch: ReturnType<typeof useAppState>["dispatch"];
+  currentStep: number;
 }
 
 /**
@@ -229,14 +231,11 @@ function handleEvent(event: SSEEventV1, ctx: RunStepContext): void {
       return;
 
     case "message":
-      // Assistant streaming output. For MVP we concatenate into the last agent
-      // chat bubble for the current step.
       ctx.dispatch({
         type: "ADD_MESSAGE",
         message: {
           data_product_id: "live",
-          step: 1, // step-number specificity happens in a later pass; renderers
-                   // filter by current_step which the reducer already tracks.
+          step: ctx.currentStep,
           message_role: "agent",
           message_text: event.content,
           timestamp: new Date().toISOString(),
@@ -277,14 +276,11 @@ function handleEvent(event: SSEEventV1, ctx: RunStepContext): void {
       if (event.code === "memory_unreachable") {
         ctx.dispatch({ type: "MEMORY_STATUS_SET", status: "unreachable" });
       }
-      // Surface the error in chat so the user isn't left staring at silence.
-      // The demo engine's opening-message effect won't re-fire while the user's
-      // message already occupies the step, so without this the UI appears to hang.
       ctx.dispatch({
         type: "ADD_MESSAGE",
         message: {
           data_product_id: "live",
-          step: 1,
+          step: ctx.currentStep,
           message_role: "agent",
           message_text: `⚠️ ${event.code}: ${event.message}`,
           timestamp: new Date().toISOString(),
