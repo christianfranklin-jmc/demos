@@ -12,7 +12,10 @@ import type { StepNumber } from "../lib/types";
 
 export interface StepOpener {
   greeting: string;
+  /** Initial prompts shown at step entry (before any user message). */
   suggestions: string[];
+  /** Continuation prompts attached to every live agent response. */
+  followups: string[];
 }
 
 export const STEP_OPENERS: Record<StepNumber, StepOpener | null> = {
@@ -27,6 +30,14 @@ export const STEP_OPENERS: Record<StepNumber, StepOpener | null> = {
       "Track product sales by territory and region",
       "Measure employee performance across orders",
     ],
+    followups: [
+      "Also track returns and refunds",
+      "Include seasonal and monthly trends",
+      "Add supplier performance metrics",
+      "Focus on high-value customers",
+      "Add data quality requirements (completeness, freshness)",
+      "Add PII and governance constraints",
+    ],
   },
 
   2: {
@@ -37,6 +48,12 @@ export const STEP_OPENERS: Record<StepNumber, StepOpener | null> = {
       "Focus on the orders fact and its dimensions",
       "Include the employee reports-to hierarchy",
       "Show only sales-related entities (orders, customers, products)",
+    ],
+    followups: [
+      "Add a Date conformed dimension",
+      "Include Shipper and Territory as lookup dimensions",
+      "Flag any entities with no incoming relationships",
+      "Show the cardinalities inline on each edge",
     ],
   },
 
@@ -49,6 +66,12 @@ export const STEP_OPENERS: Record<StepNumber, StepOpener | null> = {
       "Focus on revenue measures (unit_price * quantity)",
       "Sample values for each attribute",
     ],
+    followups: [
+      "Add a fct_order_lines grain (one row per line item)",
+      "Flag nullable columns that need imputation",
+      "Show suggested surrogate keys",
+      "Add a late-arriving dimension strategy",
+    ],
   },
 
   4: {
@@ -59,6 +82,12 @@ export const STEP_OPENERS: Record<StepNumber, StepOpener | null> = {
       "Include a revenue metric in the semantic layer",
       "Target PostgreSQL with dbt-utils surrogate keys",
       "Add quality tests to the marts",
+    ],
+    followups: [
+      "Re-generate with mart models included",
+      "Add not_null and unique tests to every PK",
+      "Include an incremental materialization strategy",
+      "Add a semantic metric for average order value",
     ],
   },
 };

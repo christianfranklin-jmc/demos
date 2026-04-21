@@ -230,7 +230,11 @@ function handleEvent(event: SSEEventV1, ctx: RunStepContext): void {
       // events without changing this dispatcher.
       return;
 
-    case "message":
+    case "message": {
+      // Attach the step's follow-up suggestions so the chat stays interactive
+      // after the agent's closing message — otherwise the user has a reply
+      // with no next action visible.
+      const opener = STEP_OPENERS[ctx.currentStep as 0 | 1 | 2 | 3 | 4];
       ctx.dispatch({
         type: "ADD_MESSAGE",
         message: {
@@ -238,10 +242,12 @@ function handleEvent(event: SSEEventV1, ctx: RunStepContext): void {
           step: ctx.currentStep,
           message_role: "agent",
           message_text: event.content,
+          suggested_replies: opener?.followups ?? [],
           timestamp: new Date().toISOString(),
         } as any,
       });
       return;
+    }
 
     case "artifact_update":
       if (event.artifact_type === "prd") {
