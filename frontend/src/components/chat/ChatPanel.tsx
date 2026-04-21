@@ -26,9 +26,19 @@ export default function ChatPanel() {
     (m) => m.step === currentStep
   );
 
-  // Last agent message's suggested replies
+  // Last agent message's suggested replies, minus anything the user already
+  // used in this step. Prevents the same pill showing up after it's been
+  // clicked, which was causing users to re-click identical prompts and see
+  // nearly-identical agent responses.
   const lastAgentMessage = [...messages].reverse().find((m) => m.message_role === "agent");
-  const suggestedReplies = lastAgentMessage?.suggested_replies ?? [];
+  const usedPrompts = new Set(
+    messages
+      .filter((m) => m.message_role === "user")
+      .map((m) => m.message_text.trim().toLowerCase()),
+  );
+  const suggestedReplies = (lastAgentMessage?.suggested_replies ?? []).filter(
+    (r) => !usedPrompts.has(r.trim().toLowerCase()),
+  );
 
   // Scroll handling
   const handleScroll = useCallback(() => {

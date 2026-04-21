@@ -12,7 +12,9 @@ export default function SuggestedReplies({ replies, onSelect }: SuggestedReplies
   const [visibleCount, setVisibleCount] = useState(0);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
-  const maxReplies = theme.agent.maxSuggestedReplies ?? 3;
+  // Let every available pill show (up to ~6) — we filter used ones upstream
+  // in ChatPanel, so capping at 3 would hide valid follow-ups for no reason.
+  const maxReplies = Math.max(theme.agent.maxSuggestedReplies ?? 3, 6);
   const displayReplies = replies.slice(0, maxReplies);
 
   useEffect(() => {
