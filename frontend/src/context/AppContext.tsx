@@ -183,6 +183,13 @@ function appReducer(state: AppState, action: AppAction): AppState {
           ...state.artifacts,
           prd: {
             ...prior,
+            // First: spread any new fields (source_systems, scope_in,
+            // primary_consumers, etc.) so the Visual tab's graph inputs are
+            // populated — earlier we were only handling 5 text/list fields
+            // here, so fields like source_systems were silently dropped on
+            // the floor and Step 1's Visual graph never rendered.
+            ...next,
+            // Then: specifically override the fields that need append semantics.
             business_objective:
               "business_objective" in next
                 ? concat(prior.business_objective, next.business_objective)
@@ -197,6 +204,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
                 : prior.success_criteria,
             scope_out:
               "scope_out" in next ? unionList(prior.scope_out, next.scope_out) : prior.scope_out,
+            scope_in:
+              "scope_in" in next ? unionList(prior.scope_in, next.scope_in) : prior.scope_in,
             completeness_score: Math.max(
               prior.completeness_score ?? 0,
               next.completeness_score ?? 0,
