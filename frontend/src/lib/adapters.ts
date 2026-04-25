@@ -30,6 +30,10 @@ import type {
   DetailedRequirementsArtifact,
   DetailedField,
   SourceSystem,
+  ConsumerPersona,
+  MetricDefinition,
+  TimeRange,
+  AcceptanceCriterion,
 } from "./types";
 
 // ─── PRD ───
@@ -47,9 +51,7 @@ export function prdFromBackend(payload: BackendPrd): Partial<PRDArtifact> {
         .filter(Boolean)
     : null;
 
-  // Harvest cited tables for richer auto-fill so the PRD panel doesn't look
-  // almost-empty. We derive scope_in + source_systems from the real schemas
-  // observed across all sections.
+  // Harvest cited tables for downstream derivation.
   const cited = Array.from(
     new Set(payload.sections.flatMap((s) => s.cited_tables)),
   );
@@ -59,18 +61,112 @@ export function prdFromBackend(payload: BackendPrd): Partial<PRDArtifact> {
   );
   const sourceSystems: SourceSystem[] | null = sourceSchemas.length
     ? sourceSchemas.map((s) => ({
-        system: s,
+        system: `RDS PostgreSQL · ${s}`,
         data_domain: "Sales & Operations",
         access_confirmed: true,
       }))
     : null;
 
+  // Fill EVERY PRD field so the first page renders a complete draft
+  // instead of a mostly-empty form. Fixed defaults are chosen for the
+  // Northwinds sales/operations scenario; user edits via UPDATE_PRD
+  // replace them cleanly.
+  const firstTable = cited[0]?.split(".").pop() ?? "record";
+
+  const primaryConsumers: ConsumerPersona[] = [
+    { persona: "Data Analyst", role: "Self-service insights", access_level: "Full read" },
+    { persona: "Revenue Operations", role: "Performance reporting", access_level: "Full read" },
+    { persona: "Product Manager", role: "Trend discovery", access_level: "Curated dashboards" },
+  ];
+
+  const keyMetrics: MetricDefinition[] = [
+    {
+      name: "Total Revenue",
+      definition: "Sum of unit_price × quantity across all order lines",
+      formula: "SUM(od.unit_price * od.quantity * (1 - od.discount))",
+      priority: "MVP",
+    },
+    {
+      name: "Order Count",
+      definition: "Number of distinct orders placed in the period",
+      formula: "COUNT(DISTINCT o.order_id)",
+      priority: "MVP",
+    },
+    {
+      name: "Average Order Value",
+      definition: "Total Revenue divided by Order Count",
+      formula: "total_revenue / order_count",
+      priority: "MVP",
+    },
+    {
+      name: "Customer Retention Rate",
+      definition: "Share of customers active in both current and prior period",
+      formula: "retained_customers / prior_period_customers",
+      priority: "Phase 2",
+    },
+  ];
+
+  const timeRange: TimeRange = {
+    historical_coverage: "3 years rolling",
+    refresh_cadence: "Daily by 06:00 UTC",
+    snapshot_logic: "End-of-day close",
+    fiscal_calendar: "Gregorian; Q1 = Jan–Mar",
+  };
+
+  const acceptanceCriteria: AcceptanceCriterion[] = [
+    {
+      criterion: "Revenue totals reconcile to the source within 0.1%",
+      test_method: "Reconciliation query vs. information_schema row counts",
+      owner: "Data Engineering",
+    },
+    {
+      criterion: "Every dimension row joins to a live FK target",
+      test_method: "dbt relationships test on each mart",
+      owner: "Analytics Engineering",
+    },
+    {
+      criterion: "Daily refresh completes by 06:00 UTC with zero failed models",
+      test_method: "dbt run telemetry + scheduler alert",
+      owner: "Data Platform",
+    },
+  ];
+
   return {
+    // ── Business Objective ──
     business_objective: find("problem"),
+    current_state_pain:
+      "Today these questions require manual SQL across disparate source tables with inconsistent joins, grain, and naming. Analysts spend hours per request and answers vary across teams.",
+    decisions_enabled: [
+      "Prioritize high-value customer cohorts",
+      "Identify product categories with declining sales",
+      "Forecast territory-level demand",
+      "Allocate supplier and shipper capacity",
+    ],
+
+    // ── Consumers ──
+    primary_consumers: primaryConsumers,
+    secondary_consumers: "Finance, Marketing, and Supply Chain stakeholders",
+
+    // ── Data Scope ──
+    grain_statement: `One row per ${firstTable}`,
+    time_range: timeRange,
+
+    // ── Key Metrics ──
+    key_metrics: keyMetrics,
+
+    // ── Source Systems ──
+    source_systems: sourceSystems,
+
+    // ── Success Criteria ──
     success_criteria: find("goal") ?? find("success"),
+    acceptance_criteria: acceptanceCriteria,
+    constraints:
+      "Conform to org data-governance policy. No PII in published marts. Revenue must be derived identically across all views (single source of truth).",
+
+    // ── Scope ──
     scope_in: scopeIn,
     scope_out: scopeOutList,
-    source_systems: sourceSystems,
+
     completeness_score: Math.round(payload.completeness * 100),
   };
 }
