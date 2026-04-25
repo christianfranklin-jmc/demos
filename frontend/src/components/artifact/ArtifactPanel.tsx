@@ -12,12 +12,14 @@ import GraphView from "./GraphView";
 import DemoBadge from "../shared/DemoBadge";
 import EmptyState from "../shared/EmptyState";
 import GateApproval from "../gates/GateApproval";
+import TalkToData from "./TalkToData";
 
 function getTabsForStep(
   step: number,
   enableFlags: boolean,
   enableStandards: boolean,
-  enableVisual: boolean
+  enableVisual: boolean,
+  showTalkToData: boolean,
 ): string[] {
   const config = getStepConfig(step as any);
   const tabs = [config.tab_name];
@@ -26,6 +28,10 @@ function getTabsForStep(
   if (enableVisual) tabs.push("Visual");
   if (enableFlags) tabs.push("Flags");
   if (enableStandards) tabs.push("Standards");
+  // Fifth tab per user request: "Talk to Data" for ad-hoc NL→SQL against the
+  // connected source. Only appears once a connection is set and Step 1's
+  // PRD has some content — before that, querying doesn't have a base.
+  if (showTalkToData) tabs.push("Talk to Data");
   return tabs;
 }
 
@@ -33,11 +39,14 @@ export default function ArtifactPanel() {
   const { state, dispatch } = useAppState();
   const { theme } = useTheme();
   const currentStep = state.lifecycle.current_step;
+  const showTalkToData =
+    state.connection !== null && Boolean(state.artifacts.prd.business_objective);
   const tabs = getTabsForStep(
     currentStep,
     theme.features.enableFlagSystem,
     theme.features.enableStandardsView,
-    theme.features.enableVisualGraph
+    theme.features.enableVisualGraph,
+    showTalkToData,
   );
   const activeTab = state.ui.activeArtifactTab;
   const resolvedTab = tabs.includes(activeTab) ? activeTab : tabs[0];
@@ -56,6 +65,9 @@ export default function ArtifactPanel() {
     }
     if (resolvedTab === "Visual") {
       return <GraphView stepNumber={currentStep} />;
+    }
+    if (resolvedTab === "Talk to Data") {
+      return <TalkToData />;
     }
 
     // Step-specific tabs

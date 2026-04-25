@@ -18,6 +18,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .routes_health import router as health_router
+from .routes_query import router as query_router
 from .routes_workflow import router as workflow_router
 from .zip_stream import ArtifactStore
 
@@ -58,6 +59,7 @@ def create_app() -> FastAPI:
 
     app.include_router(health_router)
     app.include_router(workflow_router)
+    app.include_router(query_router)
 
     return app
 
