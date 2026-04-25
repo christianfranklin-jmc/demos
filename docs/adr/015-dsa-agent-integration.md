@@ -1,6 +1,6 @@
 # ADR-015: DSA Frontend × PlatformAgent Backend Integration
 
-**Status**: Proposed (in-flight during `/speckit.clarify`, will move to Accepted after `/speckit.plan`)
+**Status**: Accepted (D1–D16 landed; D17 added in-flight 2026-04-24 for the Talk-to-Data scope add)
 
 **Date**: 2026-04-17
 
@@ -224,6 +224,33 @@ Per-step tool allowlist:
 - `src/platform_agent/session/memory_adapter.py` defines a typed `MemoryUnavailable` exception.
 - Backend's `routes_workflow.py` wraps Memory calls in `try/except MemoryUnavailable` and emits the new error event.
 - Frontend `AppContext` gains `memoryStatus` state and `MEMORY_STATUS_SET` action; `ContextBar.tsx` renders the banner.
+
+### D17 — Talk-to-Data NL→SQL tab (2026-04-24, user-driven scope add)
+
+**Decision**: Add a fifth artifact-panel tab ("Talk to Data") available from Step 1 onward, once a source connection exists and the PRD has at least one filled field. The tab accepts plain-English questions, translates them to SQL via Bedrock Claude Sonnet 4 (`us.anthropic.claude-sonnet-4-20250514-v1:0`), executes via the existing driver layer, and renders the results as a table alongside the generated SQL.
+
+**Rationale**:
+- Matches the Streamlit app's "Talk to Your Data" UX so customer demos have feature parity between the two surfaces (spirit of FR-003 preservation).
+- Unblocks ad-hoc exploration during a demo without breaking the 4-step workflow. The 4-step flow is a structured onboarding path; Talk-to-Data is the escape hatch.
+- Reuses the same connection and driver that Steps 1–4 use — no new credential lifecycle.
+- Direct Bedrock call (not Strands agent loop) keeps the response path synchronous and under ~3 s typical — sufficient for interactive querying without the orchestration overhead of `create_agent()` for every question.
+
+**Safety**:
+- SELECT-only / WITH-only gate on the translated SQL.
+- Regex block on `INSERT|UPDATE|DELETE|DROP|TRUNCATE|ALTER|CREATE|GRANT|REVOKE|MERGE|REPLACE|CALL|EXECUTE|COPY`.
+- Multi-statement rejection (`;` in SQL).
+- Server-side `LIMIT 250` wrapped around the model's output so accidental full-table scans can't stall the UI.
+
+**Rejected alternatives**:
+- SSE-streamed query responses: unnecessary complexity for what is a synchronous read in the typical case. Reserved for future if we add an "explain" / multi-step path.
+- Strands agent loop per query: ~10–20 s orchestration overhead vs. ~1–3 s direct Bedrock call. Too slow for interactive exploration. The four step handlers keep using the deterministic path; agent loop may be added later for richer narrative.
+- Route the frontend query through the AgentCore Gateway's `run_query` tool: would require Gateway Target provisioning (blocked by terraform provider bug noted under D10 follow-up) and adds MCP serialization overhead.
+
+**Implications for design**:
+- `POST /workflow/query` (synchronous JSON) in `src/platform_agent/api/routes_query.py`.
+- `components/artifact/TalkToData.tsx` with input, suggested-question pills, generated-SQL display, and results table.
+- `ArtifactPanel.tsx` tab-filters on `state.connection !== null && prd.business_objective` so the tab only appears when meaningful.
+- No new Terraform, no new SSM parameters — feature ships on existing Bedrock model access in the runtime's IAM role.
 
 ## Amendments
 

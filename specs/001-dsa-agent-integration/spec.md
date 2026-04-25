@@ -211,3 +211,20 @@ The Streamlit "Talk to Your Data" app and the Python CLI (`uv run python -m plat
 - **Mobile support**: Out of scope for this feature. Desktop browsers only.
 - **Internationalization**: Out of scope. English-only UI.
 - **Constitution compliance**: Any new backend code follows the existing driver/tool/observability conventions already defined in the repository. Frontend code follows the DSA project's TypeScript conventions.
+
+---
+
+## Addendum — Talk-to-Data (2026-04-24 scope add)
+
+### Clarifications
+
+- **Q (2026-04-24, post-plan scope add)**: Should an ad-hoc NL→SQL surface be included in this release?
+- **A**: Yes — "Talk to Data" tab on the artifact panel, available once a source connection exists and the Step 1 PRD has been drafted. SELECT-only, 250-row cap, direct Bedrock call (not full agent loop). See ADR-015 D17.
+
+### Functional Requirements (ad-hoc querying)
+
+- **FR-031**: After a source connection is established and the Step 1 PRD has been drafted, the UI MUST expose a "Talk to Data" tab on the artifact panel that accepts a plain-English question and returns a live query result against the connected source.
+- **FR-032**: The system MUST translate the user's question to SQL via an LLM grounded in the real scanned schema (tables + columns) so the generated SQL references only columns that exist in the source.
+- **FR-033**: The system MUST enforce read-only execution: only SELECT / WITH statements are allowed; any DDL/DML keyword (INSERT, UPDATE, DELETE, DROP, TRUNCATE, ALTER, CREATE, GRANT, REVOKE, MERGE, REPLACE, CALL, EXECUTE, COPY) MUST result in a rejected request before execution.
+- **FR-034**: The system MUST enforce a server-side row cap (250 rows) regardless of the LLM's generated SQL, surfacing a "truncated" indicator when exceeded.
+- **FR-035**: The UI MUST display both the generated SQL (for trust/traceability) and the resulting rows in a sortable/selectable table so users can verify the translation and inspect the data simultaneously.
