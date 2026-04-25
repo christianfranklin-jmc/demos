@@ -3,6 +3,7 @@ import { useAppState } from "../../context/AppContext";
 import { useTheme } from "../../context/ThemeContext";
 import { getStepConfig } from "../../lib/constants";
 import { useAgent } from "../../hooks/useAgent";
+import { useSourceDiscovery } from "../../hooks/useSourceDiscovery";
 import MessageBubble from "./MessageBubble";
 import TypingIndicator from "./TypingIndicator";
 import SuggestedReplies from "./SuggestedReplies";
@@ -20,6 +21,8 @@ export default function ChatPanel() {
 
   // Activate the agent — handles opening message and responses
   useAgent();
+  // Discover business processes/pills/product-name for the connected source.
+  useSourceDiscovery();
 
   // Filter messages for current step
   const messages = state.conversation.filter(

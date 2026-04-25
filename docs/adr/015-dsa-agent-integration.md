@@ -1,6 +1,6 @@
 # ADR-015: DSA Frontend × PlatformAgent Backend Integration
 
-**Status**: Accepted (D1–D16 landed; D17 added in-flight 2026-04-24 for the Talk-to-Data scope add)
+**Status**: Accepted (D1–D17 landed; D18/D19 added in-flight 2026-04-24 for post-connection discovery and agent-driven NL→SQL)
 
 **Date**: 2026-04-17
 
@@ -251,6 +251,48 @@ Per-step tool allowlist:
 - `components/artifact/TalkToData.tsx` with input, suggested-question pills, generated-SQL display, and results table.
 - `ArtifactPanel.tsx` tab-filters on `state.connection !== null && prd.business_objective` so the tab only appears when meaningful.
 - No new Terraform, no new SSM parameters — feature ships on existing Bedrock model access in the runtime's IAM role.
+
+### D18 — Post-connection source discovery grounds UI in the live schema (2026-04-24, user-driven scope add)
+
+**Decision**: Immediately after `CONNECTION_SET`, the frontend calls a new `POST /workflow/discover` endpoint. The backend scans the source (`scan_metadata`) and issues a single Bedrock Claude Sonnet 4 call that classifies the database into a product name, one-sentence domain summary, 3–6 business processes (name, description, key tables, measures, grain), 5–6 grounded Talk-to-Data pills, and per-step opener suggestions. The result is persisted in `AppContext.sourceContext` and in a per-process `_DISCOVERY_CACHE` on the backend.
+
+The UI then reflects the discovered source in three surfaces: ContextBar product name, Talk-to-Data pills, and Step-1 opener suggestions. The Step-1 handler reads `_DISCOVERY_CACHE` and prepends a "Business Processes Supported" section to the PRD so the document leads with the specific processes the database supports (Order Management, Product Catalog Management, CRM, etc.) instead of Kimball-style boilerplate.
+
+**Rationale**:
+- The current demo hardcodes Northwinds-flavored copy (product name "ROMI Data Product", pills about orders/customers, step-1 opener about order data). As soon as a user connects Pinnacle Financial or their own customer schema, every copy string becomes wrong — the UI looks like it is still describing Northwinds no matter what source is connected.
+- Discovery is a one-shot Bedrock call (~10 s, schema-only, no data reads), cheap enough to run on every connect and cached per source_id so subsequent step-1 turns reuse it without re-calling Bedrock.
+- Pushing the analysis through a dedicated endpoint (rather than piggybacking on step 1) keeps the step handlers deterministic and lets the ContextBar / Talk-to-Data pills update *before* the user types a single message.
+- Preserves the frontend-only demo mode (D13) escape hatch: when `demoMode.enabled`, discovery is skipped and the themed `dataProductName` / step openers stand in.
+
+**Rejected alternatives**:
+- Rely on the Strands agent to analyse the schema inside step 1: would add an agent loop to every step-1 turn (~20 s overhead) and couples discovery to a workflow step that may run many times.
+- Push discovery responsibilities onto the driver (a new `describe_business_domain()` method): domain classification is an LLM task, not a driver concern; keeps driver protocol narrow.
+- Hardcode per-database templates (northwinds.json, pinnacle.json): does not generalize to customer-provided databases, which is the whole point of the scope add.
+
+**Implications for design**:
+- New route: `src/platform_agent/api/routes_discover.py`.
+- New state: `AppContext.sourceContext: SourceContext | null`, cleared by `CONNECTION_CLEAR` and refreshed per distinct connection key (driver_type + database + host/account + schema).
+- Frontend hook: `hooks/useSourceDiscovery.ts`, mounted in `ChatPanel` next to `useAgent`.
+- Backward compatibility: all three surfaces fall back to their prior hardcoded content when `sourceContext` is null (offline, discovery failed, demo mode). No behavior change for demo-mode sessions.
+- Constitution Article V ("Live mode MUST be visible") strengthened: backend-mode + product-name now both reflect the live source.
+
+### D19 — Agent-driven NL→SQL replaces the single-shot translator (2026-04-24)
+
+**Decision**: `POST /workflow/query` now builds a Strands agent with `[scan_metadata, run_query]` tools and invokes it synchronously in a threadpool (90-second timeout). The agent iterates — probes schema, runs joins, self-corrects on failure — matching the Streamlit "Talk to Your Data" pattern. The response adds a `narrative` field alongside `generated_sql`/`columns`/`rows`. The surfaced query is the *most informative* run (max rows, last-query tie-break) rather than the last one, so an exploratory `SELECT COUNT(*)` never clobbers the answering JOIN.
+
+**Rationale**:
+- D17's single-shot translator only emits one SELECT per call. Multi-table questions ("orders per customer in 1997, with customer names") produced one-column aggregates instead of the JOIN that answers the question.
+- The Streamlit app ships the agent pattern with `run_query` as a tool and works for every database the drivers support. Using it for the FastAPI endpoint brings parity between the two surfaces.
+- Safety layer (SELECT/WITH only, DDL/DML keyword regex, row cap) is retained as a post-hoc validation on the surfaced SQL; write operations are additionally blocked at the driver level.
+
+**Rejected alternatives**:
+- Keep single-shot translator and add ad-hoc multi-statement handling: would require re-implementing the agent's tool loop in HTTP; saves no latency vs. just using the agent.
+- Make the endpoint SSE so intermediate tool calls stream to the UI: useful future work but not required for the current ask; adds complexity without a clear UX benefit for questions that typically resolve in 5–15 s.
+
+**Implications for design**:
+- Replaces D17's Bedrock-direct translator with `create_agent(tools=[scan_metadata, run_query])` invoked via `asyncio.to_thread` (Strands Agent is blocking).
+- New response field: `narrative` — rendered above the SQL in `TalkToData.tsx`.
+- New helper `_extract_last_run_query` walks the agent's message history, pairs `tool_use` with `tool_result`, and selects the most informative success.
 
 ## Amendments
 

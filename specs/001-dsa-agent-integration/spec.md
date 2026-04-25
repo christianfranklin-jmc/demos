@@ -228,3 +228,22 @@ The Streamlit "Talk to Your Data" app and the Python CLI (`uv run python -m plat
 - **FR-033**: The system MUST enforce read-only execution: only SELECT / WITH statements are allowed; any DDL/DML keyword (INSERT, UPDATE, DELETE, DROP, TRUNCATE, ALTER, CREATE, GRANT, REVOKE, MERGE, REPLACE, CALL, EXECUTE, COPY) MUST result in a rejected request before execution.
 - **FR-034**: The system MUST enforce a server-side row cap (250 rows) regardless of the LLM's generated SQL, surfacing a "truncated" indicator when exceeded.
 - **FR-035**: The UI MUST display both the generated SQL (for trust/traceability) and the resulting rows in a sortable/selectable table so users can verify the translation and inspect the data simultaneously.
+
+---
+
+## Addendum — Source Discovery & NL→SQL Hardening (2026-04-24)
+
+### Clarifications
+
+- **Q (2026-04-24, user-driven)**: Should the UI still show hardcoded Northwinds-flavored content (product name, pills, step-1 opener) when the user has connected a different database?
+- **A**: No. Product name, Talk-to-Data pills, Step-1 opener suggestions, and the PRD's leading section MUST all reflect the business processes actually discovered in the connected source. The system SHOULD be source-agnostic so Pinnacle Financial, customer schemas, or any future database presents correctly without frontend changes. See ADR-015 D18.
+- **Q (2026-04-24, user-driven)**: Is the single-shot NL→SQL translator sufficient for multi-table questions?
+- **A**: No. The NL→SQL endpoint MUST use the Strands agent with `run_query` as a tool (matching the Streamlit app's pattern) so the model can explore schema, chain joins, and self-correct. See ADR-015 D19.
+
+### Functional Requirements (source discovery and agent-driven querying)
+
+- **FR-036**: Immediately after a successful `CONNECTION_SET`, the system MUST run a source-discovery step that classifies the connected database into a product name, one-sentence domain summary, 3–6 business processes (each with name, description, key tables, measures, and grain), 5–6 plain-English question suggestions, and per-step opener suggestions — all grounded in the actual scanned schema.
+- **FR-037**: The UI MUST use the discovered `product_name` in the ContextBar, the discovered `suggested_questions` as the Talk-to-Data pills, and the discovered per-step suggestions as Step-1 opener pills whenever source discovery has completed. When discovery has not yet run (offline, failed, or demo mode), the UI MUST fall back to the themed defaults without blocking the user.
+- **FR-038**: The Step 1 PRD MUST render a "Business Processes Supported" section as its leading section whenever source discovery is available for the current connection, citing the discovered processes by name with their key tables. If discovery is unavailable, the PRD MUST fall back to the schema-only structure (prior behavior).
+- **FR-039**: The NL→SQL endpoint MUST use the Strands agent with `run_query` (and `scan_metadata`) as tools so the model can issue multiple queries, join across tables, and recover from errors. The response MUST include a `narrative` field containing the agent's plain-English explanation alongside the surfaced SQL and rows.
+- **FR-040**: The surfaced `generated_sql` in the NL→SQL response MUST be the agent's *most informative* successful query (maximum row count, with last-query tie-break) rather than simply the last query the agent ran, so exploratory probes (COUNT(*), DISTINCT) do not clobber the answering JOIN on the UI.

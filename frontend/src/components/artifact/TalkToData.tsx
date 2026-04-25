@@ -21,15 +21,17 @@ interface QueryResponse {
   row_count: number;
   truncated: boolean;
   run_id: string;
+  narrative: string;
   error: string | null;
 }
 
-const SUGGESTED_QUESTIONS = [
-  "How many orders did each customer place last year?",
-  "What are the top 10 products by total revenue?",
-  "Which shipper handles the most international orders?",
-  "Show me the average order value by territory",
-  "Which employees closed the most orders this quarter?",
+// Fallback pills — used only before the discover endpoint has returned
+// source-specific suggestions. Discovery overrides these via sourceContext.
+const FALLBACK_QUESTIONS = [
+  "How many rows are in each table?",
+  "Show a sample of 10 rows from the largest table",
+  "Which tables have foreign-key relationships to others?",
+  "List the columns and types of the largest table",
 ];
 
 export default function TalkToData() {
@@ -132,10 +134,13 @@ export default function TalkToData() {
         </button>
       </div>
 
-      {/* Suggestions */}
+      {/* Suggestions — grounded in the discovered schema once available. */}
       {!result && !loading && (
         <div className="px-4 pb-3 flex flex-wrap gap-2">
-          {SUGGESTED_QUESTIONS.map((q, i) => (
+          {(state.sourceContext?.suggestedQuestions.length
+            ? state.sourceContext.suggestedQuestions
+            : FALLBACK_QUESTIONS
+          ).map((q, i) => (
             <button
               key={i}
               type="button"
@@ -174,8 +179,29 @@ export default function TalkToData() {
       {/* Results */}
       {result && (
         <div className="px-4 pb-6">
+          {/* Narrative */}
+          {result.narrative && (
+            <div className="mb-3">
+              <p className="text-[11px] uppercase tracking-wider mb-1" style={{ color: theme.colors.textTertiary }}>
+                Answer
+              </p>
+              <div
+                className="text-sm whitespace-pre-wrap"
+                style={{
+                  background: theme.colors.surfaceSubtle,
+                  border: `1px solid ${theme.colors.borderSubtle}`,
+                  borderRadius: `${theme.layout.borderRadius.card}px`,
+                  padding: "10px 12px",
+                  color: theme.colors.textPrimary,
+                }}
+              >
+                {result.narrative}
+              </div>
+            </div>
+          )}
+
           {/* Generated SQL */}
-          <div className="mb-3">
+          {result.generated_sql && <div className="mb-3">
             <p className="text-[11px] uppercase tracking-wider mb-1" style={{ color: theme.colors.textTertiary }}>
               Generated SQL
             </p>
@@ -192,7 +218,7 @@ export default function TalkToData() {
             >
               {result.generated_sql}
             </pre>
-          </div>
+          </div>}
 
           {/* Per-query error */}
           {result.error && (
@@ -209,7 +235,7 @@ export default function TalkToData() {
           )}
 
           {/* Row count */}
-          {!result.error && (
+          {!result.error && result.columns.length > 0 && (
             <p className="text-xs mb-2" style={{ color: theme.colors.textSecondary }}>
               {result.row_count} row{result.row_count === 1 ? "" : "s"}
               {result.truncated ? ` (truncated to first 250)` : ""}

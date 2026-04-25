@@ -80,6 +80,13 @@ export function useAgent(): void {
     if (!opener) return;
     const stepMessages = state.conversation.filter((m) => m.step === step);
     if (stepMessages.length > 0) return;
+    // Prefer source-specific suggestions from /workflow/discover when
+    // available. Falls back to the schema-agnostic openers otherwise.
+    const discovered = state.sourceContext?.stepSuggestions?.[
+      String(step) as "1" | "2" | "3" | "4"
+    ];
+    const suggestions =
+      discovered && discovered.length > 0 ? discovered : opener.suggestions;
     dispatch({
       type: "ADD_MESSAGE",
       message: {
@@ -87,12 +94,12 @@ export function useAgent(): void {
         step,
         message_role: "agent",
         message_text: opener.greeting,
-        suggested_replies: opener.suggestions,
+        suggested_replies: suggestions,
         timestamp: new Date().toISOString(),
       } as any,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.lifecycle.current_step, state.demoMode.enabled]);
+  }, [state.lifecycle.current_step, state.demoMode.enabled, state.sourceContext]);
 
   useEffect(() => {
     if (state.demoMode.enabled) return; // demo engine owns message dispatch
@@ -186,7 +193,21 @@ export function runStep(
 
       if (!response.ok) {
         const text = await response.text().catch(() => "");
-        throw new Error(`HTTP ${response.status}: ${text || response.statusText}`);
+        // A non-2xx response means the backend is reachable and rejected our
+        // request (e.g. 400 "step requires a database connection"). Surface
+        // it as a chat error, but do NOT flip to demo mode — the backend is
+        // alive, the user just needs to adjust input (usually: connect first).
+        ctx.dispatch({
+          type: "ADD_MESSAGE",
+          message: {
+            data_product_id: "live",
+            step: ctx.currentStep,
+            message_role: "agent",
+            message_text: `Backend rejected request (HTTP ${response.status}): ${text || response.statusText}`,
+            timestamp: new Date().toISOString(),
+          } as any,
+        });
+        return;
       }
 
       controller.runId = response.headers.get("X-Run-Id");

@@ -12,6 +12,7 @@ import type {
   SourceConnection,
   DemoModeState,
   MemoryStatus,
+  SourceContext,
 } from "../lib/types";
 import { DEMO_PRODUCT } from "../lib/constants";
 import { createEmptyPRD } from "../lib/scoring";
@@ -39,6 +40,7 @@ interface AppState {
   connection: SourceConnection | null; // Request-scoped DB connection; never persisted.
   demoMode: DemoModeState;             // Frontend-only fallback switch (ADR-015 D13).
   memoryStatus: MemoryStatus;          // FR-030 banner driver.
+  sourceContext: SourceContext | null; // Post-connection discovery (ADR-015 D18).
 }
 
 // ─── Actions ───
@@ -72,6 +74,8 @@ type AppAction =
   | { type: "DEMO_MODE_DISABLE" }
   | { type: "DEMO_MODE_AUTO_ENABLE" }
   | { type: "MEMORY_STATUS_SET"; status: MemoryStatus }
+  | { type: "SOURCE_CONTEXT_SET"; context: SourceContext }
+  | { type: "SOURCE_CONTEXT_CLEAR" }
   | { type: "WORKFLOW_INVALIDATE_DOWNSTREAM"; fromStep: StepNumber };
 
 // ─── Initial State ───
@@ -115,6 +119,7 @@ const initialState: AppState = {
     activatedAt: null,
   },
   memoryStatus: "healthy",
+  sourceContext: null,
 };
 
 // ─── Reducer ───
@@ -369,10 +374,27 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, sessionId: action.sessionId };
 
     case "CONNECTION_SET":
-      return { ...state, connection: action.connection };
+      // Connecting self-heals auto-enabled demo mode: the usual reason a
+      // prior backend call failed was "no connection", and that's now
+      // resolved. Leave user-toggled demo mode alone.
+      return {
+        ...state,
+        connection: action.connection,
+        demoMode:
+          state.demoMode.reason === "auto_fallback"
+            ? { enabled: false, reason: null, activatedAt: null }
+            : state.demoMode,
+      };
 
     case "CONNECTION_CLEAR":
-      return { ...state, connection: null };
+      // Discovery is tied to a specific connection; clear both together.
+      return { ...state, connection: null, sourceContext: null };
+
+    case "SOURCE_CONTEXT_SET":
+      return { ...state, sourceContext: action.context };
+
+    case "SOURCE_CONTEXT_CLEAR":
+      return { ...state, sourceContext: null };
 
     case "DEMO_MODE_ENABLE":
       return {

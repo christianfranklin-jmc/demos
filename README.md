@@ -116,7 +116,7 @@ Adding a new database: create one driver file in `src/platform_agent/drivers/`, 
 
 ## Architecture Decisions
 
-The [docs/adr/](docs/adr/) directory contains 14 Architecture Decision Records:
+The [docs/adr/](docs/adr/) directory contains 15 Architecture Decision Records:
 
 | ADR | Decision |
 |-----|----------|
@@ -134,6 +134,7 @@ The [docs/adr/](docs/adr/) directory contains 14 Architecture Decision Records:
 | [012](docs/adr/012-multi-agent-orchestration.md) | Step Functions + EventBridge |
 | [013](docs/adr/013-snowflake-iceberg-migration.md) | Apache Iceberg on S3 + Glue |
 | [014](docs/adr/014-dbt-mcp-integration.md) | dbt MCP Server (40+ tools) |
+| [015](docs/adr/015-dsa-agent-integration.md) | DSA × PlatformAgent integration (D1–D19) — 4-step UX, agent-driven NL→SQL, post-connection discovery |
 
 ## Development
 

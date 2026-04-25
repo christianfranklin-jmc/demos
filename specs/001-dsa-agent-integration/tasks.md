@@ -278,6 +278,36 @@ description: "Dependency-ordered task list for 001-dsa-agent-integration"
 
 ---
 
+## Phase 10: Source Discovery & Agent-Driven NL→SQL (Post-MVP scope add)
+
+**Source**: user request 2026-04-24. Spec FR-036…FR-040. ADR-015 D18, D19.
+
+**Goal**: UI product name, Talk-to-Data pills, Step-1 opener pills, and PRD leading section all align to the business processes actually present in the connected source (Northwinds, Pinnacle, or customer-provided). NL→SQL uses the Strands agent so multi-table joins and self-correction work end-to-end.
+
+### Implementation
+
+- [X] T100 Create `/Users/mwebb/Projects/dsa-platform/src/platform_agent/api/routes_discover.py` — `POST /workflow/discover`. Runs `ensure_driver` + `scan_metadata_safe`, builds a DDL-ish schema with row counts + FKs, issues one Bedrock Claude Sonnet 4 call returning `{product_name, domain_summary, business_processes[], suggested_questions[], step_suggestions}`, caches the response in a module-level `_DISCOVERY_CACHE` keyed by `source_id`.
+- [X] T101 Wire the router in `/Users/mwebb/Projects/dsa-platform/src/platform_agent/api/app.py`.
+- [X] T102 Extend `/Users/mwebb/Projects/dsa-platform/frontend/src/lib/types.ts` — add `BusinessProcess` and `SourceContext` types.
+- [X] T103 Extend `/Users/mwebb/Projects/dsa-platform/frontend/src/context/AppContext.tsx` — add `sourceContext: SourceContext | null` to state; add `SOURCE_CONTEXT_SET` / `SOURCE_CONTEXT_CLEAR` reducer actions; extend `CONNECTION_CLEAR` to clear source context as well.
+- [X] T104 Create `/Users/mwebb/Projects/dsa-platform/frontend/src/hooks/useSourceDiscovery.ts` — fires `POST /workflow/discover` on each distinct `state.connection` identity (driver_type + database + host/account + schema), dispatches `SOURCE_CONTEXT_SET`.
+- [X] T105 Mount `useSourceDiscovery` in `/Users/mwebb/Projects/dsa-platform/frontend/src/components/chat/ChatPanel.tsx` next to `useAgent`.
+- [X] T106 Update `/Users/mwebb/Projects/dsa-platform/frontend/src/components/shell/ContextBar.tsx` — render `state.sourceContext?.productName || theme.scenario.dataProductName`.
+- [X] T107 Update `/Users/mwebb/Projects/dsa-platform/frontend/src/components/artifact/TalkToData.tsx` — render `state.sourceContext?.suggestedQuestions` when present; fall back to schema-agnostic defaults otherwise.
+- [X] T108 Update `/Users/mwebb/Projects/dsa-platform/frontend/src/hooks/useAgent.ts` — the opener effect prefers `state.sourceContext?.stepSuggestions[step]` when present, falling back to `STEP_OPENERS[step].suggestions`.
+- [X] T109 Update `/Users/mwebb/Projects/dsa-platform/src/platform_agent/workflow/step_1_requirements.py` — import `get_cached_discovery`, pass the result to `_build_prd`, and prepend a "Business Processes Supported" section citing the discovered processes with key tables and grain when available.
+- [X] T110 Replace the single-shot Bedrock translator in `/Users/mwebb/Projects/dsa-platform/src/platform_agent/api/routes_query.py` with `create_agent(tools=[scan_metadata, run_query])` invoked via `asyncio.to_thread` (90s timeout); add `narrative` field to `QueryResponse`; extract the most-informative successful `run_query` call from the agent's message history (not just the last one); retain SELECT-only / DDL-DML regex guards as post-hoc validation.
+- [X] T111 Update `/Users/mwebb/Projects/dsa-platform/frontend/src/components/artifact/TalkToData.tsx` — render a `narrative` panel above the generated SQL; gate the row-count line on `columns.length > 0`.
+
+### Deferred to follow-up
+
+- [ ] T112 [P] Contract test for `/workflow/discover` — returns valid `DiscoverResponse` for a mocked schema; falls back gracefully when Bedrock returns malformed JSON.
+- [ ] T113 [P] Contract test that `_build_prd` renders the "Business Processes Supported" section when `discovery` is provided and omits it when `None`.
+- [ ] T114 Cache invalidation: add a TTL (e.g. 1 hour) to `_DISCOVERY_CACHE` so long-running processes do not hold stale classifications, and a `disconnect` hook that evicts the entry on `CONNECTION_CLEAR`.
+- [ ] T115 Persist discovered `business_processes` into the PRD's `source_systems` and `scope_in` fields so the UI side panels reflect the same classification as the leading section.
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies

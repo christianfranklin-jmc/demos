@@ -550,3 +550,26 @@ export interface DemoModeState {
 // --- Memory health (FR-030, ADR-015 D16) ---
 
 export type MemoryStatus = "healthy" | "unreachable";
+
+// --- Post-connection source discovery (ADR-015 D18) ---
+//
+// Populated by POST /workflow/discover after CONNECTION_SET. Drives the
+// product name in ContextBar, the Talk-to-Data pills, and step-opener
+// suggestions so the UI reflects the user's actual source (Northwinds,
+// Pinnacle, etc.) rather than hardcoded demo content.
+
+export interface BusinessProcess {
+  name: string;
+  description: string;
+  key_tables: string[];
+  measures: string[];
+  grain: string | null;
+}
+
+export interface SourceContext {
+  productName: string;
+  domainSummary: string;
+  businessProcesses: BusinessProcess[];
+  suggestedQuestions: string[];
+  stepSuggestions: Record<"1" | "2" | "3" | "4", string[]>;
+}

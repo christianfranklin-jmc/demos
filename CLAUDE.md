@@ -33,7 +33,8 @@ src/platform_agent/               # Agent source code
     sse.py                        # SSEEmitter + passive 10s heartbeat (D9)
     zip_stream.py                 # In-memory zip store, 60s single-use (D10)
     routes_workflow.py            # POST /workflow/step, GET artifact, cancel
-    routes_query.py               # POST /workflow/query — NL→SQL (ADR-015 D17)
+    routes_query.py               # POST /workflow/query — agent-driven NL→SQL (ADR-015 D17+D19)
+    routes_discover.py            # POST /workflow/discover — post-connection business-process discovery (ADR-015 D18)
     routes_health.py              # GET /health (mode: local|deployed)
   workflow/                       # Step-scoped orchestration (D12)
     steps.py                      # StepId enum + STEP_REGISTRY (tool allowlist)
@@ -114,11 +115,12 @@ frontend/                         # DSA React 18 + Vite 6 + Tailwind 4 (imported
   src/
     App.tsx, main.tsx             # DSA shell
     context/
-      AppContext.tsx              # Extended with sessionId, connection, demoMode, memoryStatus
+      AppContext.tsx              # Extended with sessionId, connection, demoMode, memoryStatus, sourceContext (D18)
       ThemeContext.tsx            # Dark default per Article V
     hooks/
       useAgent.ts                 # Step dispatcher — POST /workflow/step, stream SSE
       useAgent.demo.ts            # Pre-scripted engine (demo mode fallback)
+      useSourceDiscovery.ts       # POST /workflow/discover on CONNECTION_SET (ADR-015 D18)
     lib/
       session.ts                  # Per-tab UUID in sessionStorage
       adapters.ts                 # Backend payloads → DSA artifact shapes

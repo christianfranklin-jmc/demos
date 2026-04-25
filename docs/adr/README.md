@@ -24,6 +24,7 @@ An ADR is a short document that captures a significant architectural or technica
 | [012](012-multi-agent-orchestration.md) | Multi-Agent Orchestration (Step Functions) | Accepted | 2026-03-27 |
 | [013](013-snowflake-iceberg-migration.md) | Snowflake → AWS Migration via Apache Iceberg | Accepted | 2026-03-27 |
 | [014](014-dbt-mcp-integration.md) | dbt MCP Server Integration | Accepted | 2026-03-27 |
+| [015](015-dsa-agent-integration.md) | DSA × PlatformAgent Integration (4-step UX, NL→SQL, source discovery) | Accepted | 2026-04-17 |
 
 ## Template
 

@@ -20,6 +20,7 @@ from ..api.events import (
     ToolResultEvent,
     ToolStartEvent,
 )
+from ..api.routes_discover import get_cached_discovery
 from ._shared import (
     ensure_driver,
     scan_metadata_safe,
@@ -71,7 +72,10 @@ async def run(
         )
     )
 
-    payload = _build_prd(request.user_message, tables, request.connection.schema)
+    discovery = get_cached_discovery(source_id)
+    payload = _build_prd(
+        request.user_message, tables, request.connection.schema, discovery
+    )
     emitter.emit(
         ArtifactUpdateEvent(
             run_id=run_id,
@@ -103,8 +107,19 @@ async def run(
     emitter.emit(DoneEvent(run_id=run_id, step="requirements"))
 
 
-def _build_prd(user_message: str, tables: list[dict[str, Any]], schema: str | None) -> PrdPayload:
-    """Assemble a PRD that cites real tables discovered by scan_metadata."""
+def _build_prd(
+    user_message: str,
+    tables: list[dict[str, Any]],
+    schema: str | None,
+    discovery: dict[str, Any] | None = None,
+) -> PrdPayload:
+    """Assemble a PRD that cites real tables discovered by scan_metadata.
+
+    When ``discovery`` is present (populated by POST /workflow/discover via
+    ``_DISCOVERY_CACHE``), the PRD leads with a "Business Processes
+    Supported" section so the document reflects the specific source the
+    user just connected instead of the generic Kimball-style boilerplate.
+    """
     schema_prefix = f"{schema}." if schema else ""
 
     # Rank tables: entity-shaped (single-column PK + meaningful row count)
@@ -129,6 +144,46 @@ def _build_prd(user_message: str, tables: list[dict[str, Any]], schema: str | No
     cited = table_refs[:6]
 
     sections: list[PrdSection] = []
+
+    if discovery:
+        domain_summary = str(discovery.get("domain_summary") or "").strip()
+        processes = discovery.get("business_processes") or []
+        if processes:
+            lines: list[str] = []
+            if domain_summary:
+                lines.append(domain_summary)
+                lines.append("")
+            for proc in processes[:6]:
+                if not isinstance(proc, dict):
+                    continue
+                name = str(proc.get("name", "")).strip()
+                desc = str(proc.get("description", "")).strip()
+                key_tables = proc.get("key_tables") or []
+                grain = str(proc.get("grain") or "").strip()
+                fragment = f"**{name}** — {desc}" if desc else f"**{name}**"
+                if key_tables:
+                    fragment += (
+                        " Key tables: " + ", ".join(f"`{t}`" for t in key_tables) + "."
+                    )
+                if grain:
+                    fragment += f" Grain: {grain}."
+                lines.append(fragment)
+            process_tables = [
+                t
+                for proc in processes
+                if isinstance(proc, dict)
+                for t in (proc.get("key_tables") or [])
+                if t
+            ]
+            sections.append(
+                PrdSection(
+                    heading="Business Processes Supported",
+                    body="\n\n".join(lines),
+                    cited_tables=list(dict.fromkeys(process_tables))[:8],
+                    completeness_contribution=0.25,
+                )
+            )
+
     sections.append(
         PrdSection(
             heading="Problem Statement",

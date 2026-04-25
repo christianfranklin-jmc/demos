@@ -43,7 +43,7 @@ export default function ContextBar() {
             className="text-sm"
             style={{ color: theme.colors.textPrimary, fontWeight: theme.typography.mediumWeight }}
           >
-            {theme.scenario.dataProductName}
+            {state.sourceContext?.productName || theme.scenario.dataProductName}
           </span>
           <span className="mx-1 text-sm" style={{ color: theme.colors.textTertiary }}>
             &middot;
