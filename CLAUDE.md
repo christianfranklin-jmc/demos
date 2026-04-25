@@ -33,6 +33,7 @@ src/platform_agent/               # Agent source code
     sse.py                        # SSEEmitter + passive 10s heartbeat (D9)
     zip_stream.py                 # In-memory zip store, 60s single-use (D10)
     routes_workflow.py            # POST /workflow/step, GET artifact, cancel
+    routes_query.py               # POST /workflow/query — NL→SQL (ADR-015 D17)
     routes_health.py              # GET /health (mode: local|deployed)
   workflow/                       # Step-scoped orchestration (D12)
     steps.py                      # StepId enum + STEP_REGISTRY (tool allowlist)
@@ -129,6 +130,7 @@ frontend/                         # DSA React 18 + Vite 6 + Tailwind 4 (imported
       shell/ContextBar.tsx        # backend-mode + demo-mode badges; memory banner
       chat/CancelButton.tsx       # Aborts in-flight run via getCurrentRun()
       gates/InvalidationConfirm.tsx  # FR-010 cascading-gate modal
+      artifact/TalkToData.tsx     # NL→SQL tab on the artifact panel (D17)
 eval/                             # Evaluation scripts + test cases (25 cases across 5 agents)
   test_cases/migration_agent.json # 5 test cases (schema, DDL, strategy, dbt, validation)
   test_cases/enrichment_agent.json # 4 test cases (descriptions, columns, synonyms, catalog)

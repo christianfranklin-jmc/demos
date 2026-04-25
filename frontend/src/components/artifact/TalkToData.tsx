@@ -124,7 +124,7 @@ export default function TalkToData() {
           style={{
             background: theme.colors.btnPrimaryBg,
             color: theme.colors.btnPrimaryText,
-            borderRadius: `${theme.layout.borderRadius.btn}px`,
+            borderRadius: `${theme.layout.borderRadius.button}px`,
             opacity: loading || !question.trim() ? 0.6 : 1,
           }}
         >

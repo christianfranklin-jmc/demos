@@ -257,6 +257,27 @@ description: "Dependency-ordered task list for 001-dsa-agent-integration"
 
 ---
 
+## Phase 9: Talk to Data (Post-MVP scope add)
+
+**Source**: user request 2026-04-24. Spec FR-031…FR-035. ADR-015 D17.
+
+**Goal**: ad-hoc NL→SQL querying surface on the artifact panel after Step 1 PRD is drafted.
+
+### Implementation
+
+- [X] T093 Create `/Users/mwebb/Projects/dsa-platform/src/platform_agent/api/routes_query.py` — `POST /workflow/query` synchronous endpoint. Accepts `{question, connection}`, runs `ensure_driver` + `scan_metadata_safe`, builds compact schema DDL, calls Bedrock Claude Sonnet 4 (`us.anthropic.claude-sonnet-4-20250514-v1:0`) to translate, enforces SELECT-only + `;` rejection + DDL/DML regex block + 250-row wrapper, returns `QueryResponse` JSON.
+- [X] T094 Wire the router in `/Users/mwebb/Projects/dsa-platform/src/platform_agent/api/app.py` (`app.include_router(query_router)`).
+- [X] T095 Create `/Users/mwebb/Projects/dsa-platform/frontend/src/components/artifact/TalkToData.tsx` — input, suggested-question pills (5 Northwinds prompts), Run button, generated-SQL display, results table with NULL rendering and truncation notice; handles fetch-level errors distinctly from per-query execution errors.
+- [X] T096 Extend `/Users/mwebb/Projects/dsa-platform/frontend/src/components/artifact/ArtifactPanel.tsx` — `getTabsForStep` accepts `showTalkToData: boolean`, appends "Talk to Data" tab when `state.connection !== null && prd.business_objective` is truthy; `renderContent` dispatches the tab to `<TalkToData />`.
+
+### Deferred to follow-up
+
+- [ ] T097 [P] Contract test for `/workflow/query` — SELECT-only enforcement, DDL/DML rejection matrix, 250-row cap, multi-statement rejection.
+- [ ] T098 [P] Live integration test against mocked `MockDriver` — Bedrock client stubbed to return a canned SELECT; verify end-to-end response shape.
+- [ ] T099 [US1] Per-question history: store recent questions + results in AppContext so the user can scroll back through queries without re-running.
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
