@@ -138,22 +138,20 @@ def _translate_nl_to_sql(question: str, schema_ddl: str, driver_type: str) -> st
 
 
 def _run_sql(driver: Any, sql: str) -> tuple[list[str], list[list[Any]]]:
-    """Execute the SELECT via the driver. Returns (columns, rows)."""
-    # Enforce a hard row cap in case the model forgot LIMIT.
-    # We do this by wrapping in a subquery — works on PostgreSQL, Redshift,
-    # and Snowflake (all SQL-standard).
+    """Execute the SELECT via the driver. Returns (columns, rows).
+
+    The DatabaseDriver protocol exposes `execute_query(sql, max_rows)` — we
+    rely on it (not `run_query`, which is the name used by the Strands
+    `@tool` wrapper but not the driver itself).
+    """
+    # Belt-and-suspenders row cap: wrap the model's SQL in a subquery with a
+    # hard LIMIT. Works on PostgreSQL, Redshift, and Snowflake (standard SQL).
     wrapped = f"SELECT * FROM ({sql}) AS _q LIMIT {MAX_ROWS + 1}"
-    query_fn = getattr(driver, "run_query", None) or getattr(driver, "query", None)
-    if query_fn is None:
-        raise HTTPException(500, "Driver has no run_query method")
-    result = query_fn(wrapped)
-    if isinstance(result, dict):
-        columns = result.get("columns") or result.get("column_names") or []
-        rows = result.get("rows") or []
-    else:
-        # Rows-only fallback — synthesize column names.
-        rows = list(result) if result else []
-        columns = [f"col_{i}" for i in range(len(rows[0]))] if rows else []
+    result = driver.execute_query(wrapped, max_rows=MAX_ROWS + 1)
+    if not isinstance(result, dict):
+        raise HTTPException(500, "Driver returned unexpected shape from execute_query")
+    columns = result.get("columns") or result.get("column_names") or []
+    rows = result.get("rows") or []
     normalized: list[list[Any]] = []
     for r in rows:
         if isinstance(r, (list, tuple)):

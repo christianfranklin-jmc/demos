@@ -111,11 +111,8 @@ async def run(
 def _sample_values(driver: Any, fq_table: str, column: str) -> list[str]:
     """Return up to 5 representative values. Best-effort; empty list on failure."""
     try:
-        query_fn = getattr(driver, "run_query", None) or getattr(driver, "query", None)
-        if query_fn is None:
-            return []
         sql = f'SELECT DISTINCT "{column}" FROM {fq_table} LIMIT 5'
-        result = cast(Any, query_fn(sql))
+        result = cast(Any, driver.execute_query(sql, max_rows=5))
         rows = result.get("rows") if isinstance(result, dict) else result
         return [str(r[0]) if isinstance(r, (list, tuple)) else str(r) for r in rows or []][:5]
     except Exception:
