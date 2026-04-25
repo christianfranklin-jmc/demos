@@ -45,6 +45,18 @@ class PasswordCredential(BaseModel):
     kind: Literal["password"] = "password"
     password: str
 
+    # Strip leading/trailing whitespace on password — copy-paste artifacts
+    # (trailing newline from a clipboard, leading tab from a secret manager
+    # export) were producing silent "password authentication failed" loops.
+    # A password that legitimately begins or ends with whitespace is an
+    # extraordinarily rare edge case and not worth protecting against.
+    @field_validator("password", mode="before")
+    @classmethod
+    def _trim_password(cls, v: object) -> object:
+        if isinstance(v, str):
+            return v.strip()
+        return v
+
 
 class SSOExternalBrowserCredential(BaseModel):
     model_config = ConfigDict(extra="forbid")
