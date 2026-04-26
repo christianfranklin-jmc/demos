@@ -86,6 +86,7 @@ description: "Task list — DSA Hub Pinnacle Cross-Source"
 
 - [ ] T030 [P] Author `docs/adr/016-multi-connection-workspace.md` recording Q1 (per-tab/session) decision; landed in the same commit as T013/T014
 - [ ] T031 [P] Author `docs/adr/017-per-connection-semantic-graph.md` recording Q2 + R2 (per-connection store, SQLite local / DynamoDB deployed); landed in the same commit as T019/T020
+- [ ] T031a [P] Author **initial** `docs/adr/020-provisioning-orchestration-iceberg.md` (Iceberg driver decision only — R3); landed in the same commit as T016. The orchestration + validation-threshold + palette portions of the decision (R6 + R8 + R10) are added as an amendment in Phase 5 (T090). This split keeps Addendum E's "ADR lands with the decision" invariant intact, since the IcebergDriver decision physically commits in Phase 2.
 
 **Checkpoint**: Foundation ready — every user story phase below can now begin in parallel (subject to team capacity).
 
@@ -216,7 +217,7 @@ description: "Task list — DSA Hub Pinnacle Cross-Source"
 
 ### ADR
 
-- [ ] T090 [P] [US3] Author `docs/adr/020-provisioning-orchestration-iceberg.md` recording R3 + R6 + R8 + R10 (orchestrator design, Iceberg driver decision, validation threshold, palette extension); landed in the same commit as T077/T079
+- [ ] T090 [P] [US3] **Amend** `docs/adr/020-provisioning-orchestration-iceberg.md` (initial Iceberg-driver-only stub created in T031a) with the orchestration + validation threshold + palette extension portions: R6 (orchestrator design + SSE v2), R8 (validation threshold gate at 80% with provisional/final state machine), R10 (status-success / status-error palette additions). Landed in the same commit as T077/T079.
 
 **Checkpoint**: PRD acceptance produces a streaming DAG run terminating in a registered Iceberg Data Product (final or provisional).
 
@@ -423,7 +424,7 @@ US7 (P3, Standards content) — independent; runnable any time after Phase 2
 - **Within US2**: T058–T062 (frontend components + hooks) parallel; T053 (prompt) + T052 (tool) + T054 (route) sequential within the agent path.
 - **Within US3**: T069–T076 (agent file moves + new agents) all parallel; T083–T086 (frontend) parallel; T089 (palette) parallel with everything.
 - **Within US4–US7**: most frontend component creation [P]; backend tools [P] when in different files.
-- **All ADR tasks (T030, T031, T065, T090, T102, T125)** are [P] — different files, paired with their implementing commit.
+- **All ADR tasks (T030, T031, T031a, T065, T090 [amend], T102, T125)** are [P] — different files (or different commits for the T031a/T090 amendment pair), paired with their implementing code commit per Addendum E.
 - **Polish phase**: T137–T140 performance verifications and T142 eval can run in parallel; T143 demo mode is independent.
 
 ### Within Each User Story
