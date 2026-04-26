@@ -363,6 +363,7 @@ The FAST pattern uses `BedrockAgentCoreApp` with `@app.entrypoint`, replacing th
 ## Active Technologies
 - Python 3.12+ (backend, agents, Lambda tools); TypeScript 5.6 + React 18 (frontend) per Constitution Article II. (001-dsa-agent-integration)
 - Ephemeral only. (001-dsa-agent-integration)
+- Python 3.12+ (backend, agents, Lambda tools); TypeScript 5.6 + React 18 (frontend) per Constitution Article II. CLI text-mode equivalent for every UI surface (three-frontend rule from CLAUDE.md). (002-dsa-hub-pinnacle)
 
 ## Recent Changes
 - 001-dsa-agent-integration: Added Python 3.12+ (backend, agents, Lambda tools); TypeScript 5.6 + React 18 (frontend) per Constitution Article II.

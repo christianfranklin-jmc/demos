@@ -1,0 +1,105 @@
+openapi: 3.0.3
+info:
+  title: DSA Hub — Redundancy Gate
+  version: "1.0.0"
+  description: |
+    Pre-acceptance gate (FR-026, US-6). Checks the drafted PRD against the
+    target Iceberg connection's semantic graph (Q2: target connection only;
+    no cross-connection scan). Returns a report with state + per-overlap
+    detail. Acceptance is blocked until the user records decisions for
+    partial overlaps or an override rationale for full duplicates.
+
+paths:
+  /workflow/redundancy-check:
+    post:
+      summary: Run the redundancy agent against the target connection's graph.
+      parameters:
+        - $ref: "./workspace.openapi.yaml#/components/parameters/SessionHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [prd]
+              properties:
+                prd:
+                  $ref: "./pills.openapi.yaml#/components/schemas/PRDDraft"
+      responses:
+        "200":
+          description: Report produced.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RedundancyReport" }
+        "400":
+          description: PRD target connection is not a live iceberg-driver connection (FR-031, Q3).
+
+  /workflow/redundancy-check/{report_id}/decide:
+    post:
+      summary: Record reuse-or-override decisions for the report's overlaps.
+      parameters:
+        - $ref: "./workspace.openapi.yaml#/components/parameters/SessionHeader"
+        - in: path
+          name: report_id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decisions]
+              properties:
+                decisions:
+                  type: array
+                  items: { $ref: "#/components/schemas/Decision" }
+                override_rationale:
+                  type: string
+                  description: Required iff the report state is `duplicate`.
+      responses:
+        "200":
+          description: Decisions accepted; PRD acceptance unblocked.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  cleared_to_provision: { type: boolean }
+        "409":
+          description: Decisions incomplete or rationale missing.
+
+components:
+  schemas:
+    RedundancyReport:
+      type: object
+      required: [report_id, prd_id, target_connection_id, state, overlaps, generated_at]
+      properties:
+        report_id: { type: string }
+        prd_id: { type: string }
+        target_connection_id: { type: string }
+        state:
+          type: string
+          enum: [net_new, partial_overlap, duplicate]
+        overlaps:
+          type: array
+          items: { $ref: "#/components/schemas/OverlapItem" }
+        generated_at: { type: string, format: date-time }
+
+    OverlapItem:
+      type: object
+      required: [proposed_name, existing_id, kind, overlap_pct]
+      properties:
+        proposed_name: { type: string }
+        existing_id: { type: string, description: "Existing entity_id or metric_id in the target store." }
+        kind: { type: string, enum: [entity, metric] }
+        overlap_pct: { type: number, minimum: 0, maximum: 100 }
+        side_by_side_diff: { type: string, format: markdown }
+
+    Decision:
+      type: object
+      required: [overlap_existing_id, kind]
+      properties:
+        overlap_existing_id: { type: string }
+        kind: { type: string, enum: [reuse, override] }
+        rationale: { type: string }
