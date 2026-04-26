@@ -1,8 +1,8 @@
 # ADR-020: Provisioning Orchestration into Iceberg
 
-**Status**: D1 + D2 + D3 landed (feature `002-dsa-hub-pinnacle` Phases 2 + 5 backend). D4 (palette extension at the CSS-token level — T089) lands with the US3 frontend Build page in the next commit.
+**Status**: Accepted. D1 + D2 + D3 + D4 all landed in feature `002-dsa-hub-pinnacle` Phases 2 + 5.
 
-**Date**: 2026-04-26 (D1, D2, D3); D4 to land alongside the Build page (T089)
+**Date**: 2026-04-26 (D1 Phase 2; D2/D3 Phase 5 backend; D4 Phase 5 frontend)
 
 **Feature**: `specs/002-dsa-hub-pinnacle/`
 
@@ -65,19 +65,24 @@ Step Functions orchestration (the existing migration-suite plan) is deferred to 
 - *Auto-rerun without user input*: rejected — silently spending a build cycle violates Article VIII (loading/error states must be visible).
 - *Hardcode 80%*: rejected — env-driven for future flexibility, but defaults to the spec'd line.
 
-### D4 — Palette extension limited to two semantic-only roles (Phase 5, T089; **TBD — to amend**)
+### D4 — Palette extension limited to two semantic-only roles (Phase 5, T089)
 
-*Decision pending; will be amended into this ADR in the same commit that adds the CSS custom properties.*
+**Decision**: Added two CSS custom properties to `frontend/src/styles/tokens.css`:
 
-Outline of the planned decision:
+```css
+--status-success: #16A34A;
+--status-error:   #DC2626;
+```
 
-- Add two CSS custom properties: `--status-success: #16A34A` and `--status-error: #DC2626`.
-- Used **only** for: agent DAG node states (active = phData Teal pulse, complete = success-green, failed = status-error), Validation Card ✓/✗ chips, connection card pulse dots.
-- All other UI continues to use the strict phData palette (Navy / Blue / Teal / Orange + dark surfaces).
-- This is the Article V deviation acknowledged in feature plan.md Complexity Tracking row 1.
+Usage is scoped — by code comment + by where they're consumed — to:
+- Agent DAG node ring color (`AgentDAG.tsx`): active = phData Teal pulse, complete = success-green, failed = status-error.
+- Validation Card ✓/✗ glyphs (`Build.tsx`).
+- Connection card pulse dot (`ConnectionCard.tsx` already inlined the same hexes; replacing with var() is mechanical).
+- ActivityStream level dots (info=tertiary, success=success-green, warn=phData Orange, error=status-error).
 
-**Alternatives considered for D4**:
+All other UI continues to use the strict phData palette (Navy / Blue / Teal / Orange + dark surfaces). This is the Article V deviation justified in feature plan.md Complexity Tracking row 1.
 
+**Alternatives considered**:
 - *Use the user input's full accent palette* (`#00d4a0`, `#fbbf24`, `#4f8fff`, `#a855f7`, `#f472b6`): rejected — five off-brand colors is a much larger Article V deviation; only success/error are load-bearing for status semantics.
 - *Use icons + greyscale only*: rejected — color-blind-unsafe for binary status; "green check / red x" is the universal idiom.
 - *Use phData Orange for "failed"*: rejected — Orange is an accent color, not a danger signal; conflates with active states.

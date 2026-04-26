@@ -40,6 +40,12 @@
   --blue-flag: #3B82F6;
   --gray-flag: #9CA3AF;
 
+  /* 002-dsa-hub-pinnacle (T089, ADR-020 D4) — status-only color tokens.
+     Used by the agent DAG, Validation Card, and connection status pulse.
+     Limited to two semantic roles per Article V deviation rationale. */
+  --status-success: #16A34A;
+  --status-error: #DC2626;
+
   /* Entity card borders (Step 2) */
   --entity-fact: #BFDBFE;
   --entity-dim: #99F6E4;

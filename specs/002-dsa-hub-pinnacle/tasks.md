@@ -203,17 +203,17 @@ description: "Task list — DSA Hub Pinnacle Cross-Source"
 
 ### Frontend implementation for US3
 
-- [ ] T082 [P] [US3] Create `frontend/src/routes/Build.tsx` (route `/build/:run_id`) — hosts AgentDAG + BuildKPIStrip + ActivityStream + ValidationCard
-- [ ] T083 [P] [US3] Create `frontend/src/components/build/AgentDAG.tsx` — React Flow graph with the 7 agent nodes + dependency edges; pulse on active, ✓ on complete with artifact summary, amber/retry on failed (FR-028, US-3 acceptance #2: <1s state-update latency)
-- [ ] T084 [P] [US3] Create `frontend/src/components/build/BuildKPIStrip.tsx` — rows in motion / agents active / latency p95 / files written / est cost / ETA; SSE-driven (FR-030)
-- [ ] T085 [P] [US3] Create `frontend/src/components/build/ActivityStream.tsx` — timestamped log entries with agent name + badge + message + code spans for object names
-- [ ] T086 [P] [US3] Create `frontend/src/hooks/useProvisioningRun.ts` — subscribes to `/workflow/provision/{run_id}/events`; maps v2 events into in-memory `ProvisioningRunState`
-- [ ] T087 [US3] Build out `frontend/src/lib/agentcore-client/parsers/v2/index.ts` — extends v1 with the 11 new event kinds; version-gated by `v: 2` envelope field (R6)
-- [ ] T088 [US3] Wire Step 4's "Accept & provision" CTA to `POST /workflow/provision`; on 201 navigate to `/build/<run_id>`; on `400 no_iceberg_target` surface an "Add Iceberg target connection" modal (FR-031 edge case)
+- [X] T082 [P] [US3] Created `frontend/src/routes/Build.tsx` (~250 lines) — runs the SSE consumer; hosts BuildKPIStrip + AgentDAG + ActivityStream + ValidationCard. Terminal banner indicates final/provisional product. Empty state when no run_id; stream-error banner.
+- [X] T083 [P] [US3] Created `frontend/src/components/build/AgentDAG.tsx` (~225 lines) — React Flow graph with 7 agent nodes + 7 dependency edges from R6 (incl. mapping → {semantic, delivery} fanout). Custom `AgentNode` component: state ring color via `--status-success` / `--status-error` / accent / borderSubtle; animate-pulse while active; ✓/✗ corner glyph on complete/failed; per-agent inline Retry button on failure that calls `useProvisioningRun.retry(agent_id)`.
+- [X] T084 [P] [US3] Created `frontend/src/components/build/BuildKPIStrip.tsx` — 6 tiles (rows in motion / agents active / files written / latency p95 / est cost / ETA), each with requestAnimationFrame easing on numeric updates (FR-030).
+- [X] T085 [P] [US3] Created `frontend/src/components/build/ActivityStream.tsx` — timestamped log with level dots (•/✓/!/✗), per-agent badge, auto-scroll-to-newest, capped at 200 rows in the source.
+- [X] T086 [P] [US3] Created `frontend/src/hooks/useProvisioningRun.ts` (~290 lines) — subscribes to `/workflow/provision/{run_id}/events`, reduces v2 events into a `ProvisioningRunState` (per-agent snapshot, ticks, artifacts, validation results, activity rows, terminal product). AbortController cancellation; reset on run_id change. Exposes `retry(agent_id)` that POSTs the retry endpoint.
+- [X] T087 [US3] Built `frontend/src/lib/agentcore-client/parsers/v2/index.ts` (~190 lines) — typed unions for the 11 event kinds, `splitFrames()` for SSE buffering, `parseFrame()` with v2 envelope validation, `streamEvents()` async-generator that yields typed events from a fetch/Response stream.
+- [X] T088 [US3] Wired Step1Discovery `onPillAccepted` → `startProvisioning(prd)` in AppShell — POSTs `/workflow/provision` with `redundancy_cleared=true` (Phase 8 hardens), captures `run_id` on 201, navigates to `view="build"`. 400 errors surface inline above the Discovery page.
 
 ### Color palette extension (R10, Constitution Article V)
 
-- [ ] T089 [P] [US3] Add CSS custom properties `--status-success: #16A34A` and `--status-error: #DC2626` to `frontend/src/index.css` (or theme file); document the two-role-only constraint in a code comment + the ADR; verify no other off-brand colors land in this commit
+- [X] T089 [P] [US3] Added `--status-success: #16A34A` and `--status-error: #DC2626` CSS custom properties to `frontend/src/styles/tokens.css` with a code comment limiting their use to status semantics only (per ADR-020 D4 / R10). Used by `AgentDAG`, ActivityStream level dots, terminal banner, and the v2 parser tests.
 
 ### ADR
 

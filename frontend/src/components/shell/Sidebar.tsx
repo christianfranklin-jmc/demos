@@ -5,7 +5,7 @@ import { DATA_PRODUCTS, type DataProduct } from "../../data/mock/data-products";
 import type { StepNumber, StepStatus } from "../../lib/types";
 import ConnectionForm from "./ConnectionForm";
 
-type ShellView = "workflow" | "connections" | "discovery";
+type ShellView = "workflow" | "connections" | "discovery" | "build";
 
 interface SidebarProps {
   onSettingsOpen: () => void;
@@ -208,6 +208,13 @@ export default function Sidebar({
             label="Discovery"
             isActive={view === "discovery"}
             onClick={() => onViewChange("discovery")}
+            theme={theme}
+          />
+          <SidebarNavItem
+            icon="🛠"
+            label="Build"
+            isActive={view === "build"}
+            onClick={() => onViewChange("build")}
             theme={theme}
           />
         </div>
