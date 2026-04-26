@@ -68,8 +68,10 @@ def run(ctx: AgentContext) -> AgentOutput:
             created_at=now,
             updated_at=now,
         )
-        store.upsert_binding(binding)
+        # Entity must be inserted first — physical_bindings has a FK
+        # to entities(entity_id) (see semantic/migrations/__init__.py).
         store.upsert_entity(entity)
+        store.upsert_binding(binding)
         entity_ids.append(entity_id)
         artifacts.append(
             Artifact(
