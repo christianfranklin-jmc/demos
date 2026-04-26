@@ -22,6 +22,7 @@ from .routes_health import router as health_router
 from .routes_query import router as query_router
 from .routes_workflow import router as workflow_router
 from .routes_workspace import router as workspace_router
+from .routes_workspace_discover import router as workspace_discover_router
 from .zip_stream import ArtifactStore
 
 logger = logging.getLogger(__name__)
@@ -76,6 +77,7 @@ def create_app() -> FastAPI:
     app.include_router(query_router)
     app.include_router(discover_router)
     app.include_router(workspace_router)
+    app.include_router(workspace_discover_router)
 
     return app
 
