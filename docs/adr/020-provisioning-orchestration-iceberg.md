@@ -40,7 +40,14 @@ Event stream is **schema v2** (`src/platform_agent/provisioning/events.py`), add
 
 State: per-run state lives in-memory keyed by `run_id`; durable per-Connection store records (entities, products, activity log) are written through the `ConnectionStore` as the run progresses so the audit chain survives even if the SSE consumer disconnects (verified by `delivery_agent` writing the `IcebergDataProduct` via `make_store(target_connection_id).upsert_product(...)`).
 
-**Agent v1 status**: Five "promoted" agents are stubs that emit realistic-looking artifacts (column lists, dbt model paths, Iceberg table names) without yet calling dbt or pyiceberg. The orchestrator + event-stream architecture is the load-bearing piece; agent internals can be promoted incrementally from `patterns/migration-agent/` and `patterns/quality-agent/`. Two net-new agents (`semantic`, `delivery`) are real — `semantic_agent` writes entities/metrics into the target connection's store via the `ConnectionStore` Protocol; `delivery_agent` runs auto-validation and flips the product final/provisional.
+**Agent v1 status (Phase 5 + Phase 10 promotions)**:
+
+- `schema_agent` — **promoted in Phase 10**. Reads live driver metadata via `WorkspaceRegistry` + `_scan_connection`; emits `source_schema` per connection (with `tables_scanned` + `schemas_scanned`) plus a real `iceberg_ddl_plan` whose target column list comes from the PRD's `entities_proposed` (or, when empty, from `joins_identified` shared keys). Type map promoted verbatim from `patterns/migration-agent/tools/convert_to_iceberg.py` and extended for Postgres / Redshift idioms. Falls back to a stub when the workspace context isn't reachable so unit tests stay offline.
+- `mapping_agent` — **promoted in Phase 10**. Reads schema_agent's `iceberg_ddl_plan`; attempts a real `pyiceberg.Catalog.create_table()` against the target IcebergDriver's Glue catalog. `register_status` ∈ {`created`, `already_exists`, `planned_only` (offline fallback), `error`}; the DAG continues regardless of the outcome — delivery_agent decides final/provisional based on validation, not on register success. The graceful fallback keeps tests offline-runnable.
+- `pipeline_agent`, `model_agent`, `quality_agent` — still stubs that emit realistic-looking artifacts (per-source-pull row simulation, dbt model paths, DQDL rule sets). Real bodies land when the live demo path needs them; the `pyiceberg`+`dbt-glue` write loop is exercised end-to-end via `mapping_agent` already.
+- `semantic_agent`, `delivery_agent` — real from the start (Phase 5). `semantic_agent` writes entities/metrics into the target ConnectionStore via the Protocol; `delivery_agent` runs auto-validation and flips the product final/provisional through `SQLiteConnectionStore.upsert_product` per the threshold gate.
+
+The orchestrator + event-stream architecture is the load-bearing piece; agent internals continue to be promoted incrementally.
 
 Step Functions orchestration (the existing migration-suite plan) is deferred to deployed-mode and does not block v1 in-product flow.
 
