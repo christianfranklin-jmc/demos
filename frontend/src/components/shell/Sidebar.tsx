@@ -10,7 +10,8 @@ type ShellView =
   | "connections"
   | "discovery"
   | "build"
-  | "semantic";
+  | "semantic"
+  | "standards";
 
 interface SidebarProps {
   onSettingsOpen: () => void;
@@ -227,6 +228,13 @@ export default function Sidebar({
             label="Semantic"
             isActive={view === "semantic"}
             onClick={() => onViewChange("semantic")}
+            theme={theme}
+          />
+          <SidebarNavItem
+            icon="📚"
+            label="Standards"
+            isActive={view === "standards"}
+            onClick={() => onViewChange("standards")}
             theme={theme}
           />
         </div>

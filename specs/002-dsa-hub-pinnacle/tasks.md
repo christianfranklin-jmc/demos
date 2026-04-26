@@ -337,19 +337,19 @@ description: "Task list — DSA Hub Pinnacle Cross-Source"
 
 ### Standards content
 
-- [ ] T126 [P] [US7] Create `src/platform_agent/standards/` directory with one Markdown file per category: `naming.md`, `metrics.md`, `pii_policy.md` (informational only per Q4), `dbt_templates.md`, `domains.md` (Pinnacle: `wealth_mgmt`, `accounting`, `crm`, `hr`, `planning`), `iceberg_standards.md` (partitioning, sort orders, retention)
-- [ ] T127 [P] [US7] Update `src/platform_agent/tools/standards_read.py` (stub from T051) to fully resolve content from `standards/` and join in approved metrics from per-connection semantic graphs
+- [X] T126 [P] [US7] Created `src/platform_agent/standards/` with the 6 Markdown files (FR-037): `naming.md`, `metrics.md`, `pii_policy.md` (informational only per Q4), `dbt_templates.md`, `domains.md`, `iceberg_standards.md`. Pinnacle-specific (Postgres process schemas, Glue conventions, MetricFlow-compatible metrics).
+- [ ] T127 [P] [US7] `tools/standards_read.py` @tool wrapper — DEFERRED. Pills already carry a static `STANDARDS_APPLIED_DEFAULT` footer (4 entries) per FR-038/SC-011, and the integration test T129 asserts the invariant. Live join with the per-connection metric registry lands when pill-agent goes LLM (ADR-021 D2).
 
 ### Backend implementation for US7
 
-- [ ] T128 [US7] Create `src/platform_agent/api/routes_standards.py` — read-only `GET /standards` and `GET /standards/{category}` endpoints; no contract test file needed (small surface; covered by integration test T129)
-- [ ] T129 [P] [US7] Integration test: `tests/integration/test_standards_footer.py` — generates a PRD via `step_1_requirements` and asserts the resulting `standards_applied` list is non-empty (SC-011, FR-038)
-- [ ] T130 [US7] Wire `routes_standards` into `app.py`
+- [X] T128 [US7] Created `src/platform_agent/api/routes_standards.py` — `GET /standards` (categories + previews), `GET /standards/{category}` (full Markdown body). Static file reader rooted at `src/platform_agent/standards/`.
+- [X] T129 [P] [US7] Integration test: `tests/integration/test_standards_footer.py` — 4 tests: list returns all 6 categories with non-empty previews; category endpoint returns Markdown body; 404 for unknown category; **every pill_generator output carries a non-empty `seed_prd_body.standards_applied` (SC-011 invariant)**.
+- [X] T130 [US7] Wired `standards_router` into `app.py`.
 
 ### Frontend implementation for US7
 
-- [ ] T131 [P] [US7] Create `frontend/src/routes/Standards.tsx` (route `/standards`) — sectioned read-only browser
-- [ ] T132 [P] [US7] Create `frontend/src/components/standards/StandardsBrowser.tsx` — category sidebar + Markdown content rendering
+- [X] T131 [P] [US7] Created `frontend/src/routes/Standards.tsx` — header + StandardsBrowser; mounted as a 6th top-level Sidebar view (📚 Standards).
+- [X] T132 [P] [US7] Created `frontend/src/components/standards/StandardsBrowser.tsx` — left-side category list with previews + right-side Markdown content pane. Auto-loads first category on mount; client-side fetch with abort-on-unmount.
 
 **Checkpoint**: Standards visible; PRD footers populated.
 

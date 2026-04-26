@@ -23,6 +23,7 @@ from .routes_query import router as query_router
 from .routes_query_cross_source import router as query_cross_source_router
 from .routes_redundancy import router as redundancy_router
 from .routes_semantic import router as semantic_router
+from .routes_standards import router as standards_router
 from .routes_workflow import router as workflow_router
 from .routes_workflow_provision import router as workflow_provision_router
 from .routes_workspace import router as workspace_router
@@ -86,6 +87,7 @@ def create_app() -> FastAPI:
     app.include_router(query_cross_source_router)
     app.include_router(semantic_router)
     app.include_router(redundancy_router)
+    app.include_router(standards_router)
 
     return app
 
