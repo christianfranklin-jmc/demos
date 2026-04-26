@@ -21,6 +21,7 @@ from .routes_discover import router as discover_router
 from .routes_health import router as health_router
 from .routes_query import router as query_router
 from .routes_workflow import router as workflow_router
+from .routes_workflow_provision import router as workflow_provision_router
 from .routes_workspace import router as workspace_router
 from .routes_workspace_discover import router as workspace_discover_router
 from .zip_stream import ArtifactStore
@@ -78,6 +79,7 @@ def create_app() -> FastAPI:
     app.include_router(discover_router)
     app.include_router(workspace_router)
     app.include_router(workspace_discover_router)
+    app.include_router(workflow_provision_router)
 
     return app
 

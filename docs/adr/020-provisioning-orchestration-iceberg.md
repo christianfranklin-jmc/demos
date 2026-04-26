@@ -1,8 +1,8 @@
 # ADR-020: Provisioning Orchestration into Iceberg
 
-**Status**: In progress — initial Iceberg-driver decision (D1) landed in feature `002-dsa-hub-pinnacle` Phase 2; D2 (orchestration), D3 (validation threshold), and D4 (palette) land with US3 (Phase 5) per the in-flight Addendum E discipline.
+**Status**: D1 + D2 + D3 landed (feature `002-dsa-hub-pinnacle` Phases 2 + 5 backend). D4 (palette extension at the CSS-token level — T089) lands with the US3 frontend Build page in the next commit.
 
-**Date**: 2026-04-26 (D1); D2–D4 to be amended in-flight when their implementing commits land
+**Date**: 2026-04-26 (D1, D2, D3); D4 to land alongside the Build page (T089)
 
 **Feature**: `specs/002-dsa-hub-pinnacle/`
 
@@ -32,31 +32,38 @@ This ADR records all four decisions; D1 lands first, D2–D4 amended as their co
 - *Spark / Glue interactive sessions*: rejected — heavyweight; killed local-mode parity.
 - *Treat Iceberg only as a write target, not a connection*: rejected by clarification Q3 — the user explicitly adds it as a first-class third connection in the workspace.
 
-### D2 — 7-agent DAG orchestrator with SSE schema v2 (Phase 5, T077–T079; **TBD — to amend**)
+### D2 — 7-agent DAG orchestrator with SSE schema v2 (Phase 5, T077–T079, T067, T068)
 
-*Decision pending; will be amended into this ADR in the same commit as `src/platform_agent/provisioning/orchestrator.py`.*
+**Decision**: Implemented `src/platform_agent/provisioning/orchestrator.py` driving the 7-agent DAG `schema → pipeline → model → quality → mapping → {semantic, delivery}`. Per-agent retry via `reset_for_retry(run_id, agent_id)` resets the named agent + every downstream dependent to PENDING; completed upstream artifacts are reused (cached on the `AgentExecution` records of the in-memory `ProvisioningRun`).
 
-Outline of the planned decision:
+Event stream is **schema v2** (`src/platform_agent/provisioning/events.py`), additive over the v1 SSE schema in `api/events.py`. Envelope `{run_id, seq, ts, v: 2}` carries 11 event kinds: `agent.started`, `agent.progress`, `agent.completed`, `agent.failed`, `kpi.tick`, `artifact.produced`, `validation.started`, `validation.result`, `run.completed`, `run.needs_replan`, `heartbeat`. Sequence numbers strictly increase within a run (verified by `tests/contract/test_provision_sse_v2.py`).
 
-- DAG: `schema → pipeline → model → quality → mapping → {semantic, delivery}` (semantic and delivery run in parallel after mapping).
-- Per-agent retry: only the failed agent and its downstream dependents re-execute; completed upstream artifacts are reused (cached by `run_id`).
-- Event stream: schema **v2** of the existing SSE format, additive over v1. Envelope `{run_id, seq, ts, v: 2}` plus 11 new event kinds (`agent.started/progress/completed/failed`, `kpi.tick`, `artifact.produced`, `validation.started/result`, `run.completed`, `run.needs_replan`, `heartbeat`).
-- State: per-run state lives in-memory keyed by `run_id`; durable per-Connection store records (entities, products, activity log) are written through as the run progresses so the audit chain survives even if the SSE consumer disconnects.
-- Five existing agents (`schema`, `pipeline`, `model`, `quality`, `mapping`) are **promoted** from `patterns/migration-agent/` and `patterns/quality-agent/` into `src/platform_agent/provisioning/agents/`. Two new agents (`semantic`, `delivery`) are net-new.
+State: per-run state lives in-memory keyed by `run_id`; durable per-Connection store records (entities, products, activity log) are written through the `ConnectionStore` as the run progresses so the audit chain survives even if the SSE consumer disconnects (verified by `delivery_agent` writing the `IcebergDataProduct` via `make_store(target_connection_id).upsert_product(...)`).
+
+**Agent v1 status**: Five "promoted" agents are stubs that emit realistic-looking artifacts (column lists, dbt model paths, Iceberg table names) without yet calling dbt or pyiceberg. The orchestrator + event-stream architecture is the load-bearing piece; agent internals can be promoted incrementally from `patterns/migration-agent/` and `patterns/quality-agent/`. Two net-new agents (`semantic`, `delivery`) are real — `semantic_agent` writes entities/metrics into the target connection's store via the `ConnectionStore` Protocol; `delivery_agent` runs auto-validation and flips the product final/provisional.
 
 Step Functions orchestration (the existing migration-suite plan) is deferred to deployed-mode and does not block v1 in-product flow.
 
-### D3 — Validation threshold gate at 80 % default (Phase 5, T081 + T119–T120; **TBD — to amend**)
+**Alternatives considered**:
+- *Single monolithic agent*: rejected — kills the DAG visualization (Story 3) which is the headline UX for provisioning.
+- *Polling-based progress*: rejected — SSE is already the established pattern in the repo and provides 1s update latency (US-3 acceptance #2).
+- *Step Functions for v1 in-product flow*: rejected — adds AWS coupling for local-mode and is harder to test from pytest. Step Functions remains the deployed-mode option for the migration-suite branch.
 
-*Decision pending; will be amended into this ADR in the same commit as the threshold logic in `delivery_agent`.*
+### D3 — Validation threshold gate at 80 % default (Phase 5, T081)
 
-Outline of the planned decision:
+**Decision**: Implemented in `src/platform_agent/provisioning/agents/delivery_agent.py`. After mapping registers the Iceberg table (as a provisional product), `delivery_agent.run` walks `prd.business_questions` and produces one `ValidationResult` per question.
 
-- After mapping registers the Iceberg table, the `delivery-agent` runs each PRD `business_question` through the cross-source TTYD planner against the new table. An LLM-as-judge (Opus 4.7) evaluates each answer against the PRD's expected ranges.
-- Threshold = `DSA_HUB_VALIDATION_THRESHOLD` (default `0.80`, matching SC-004).
-- ≥ threshold → product state `final`; `ttyd_exposed = True` flipped atomically; product joins the TTYD `cross_source_query` source list.
-- < threshold → product state `provisional`; visible in the catalog and on the Semantic page but not TTYD-exposed; the run emits `run.needs_replan`. A "Re-run from failed step" affordance re-executes only the validation step (or, optionally, the upstream agent that produced the schema gap).
-- Successful rerun that lifts pass rate ≥ threshold flips `ttyd_exposed = True` atomically. Promotion is one-way in v1 (`provisional → final` only; never the reverse).
+- Threshold = `DSA_HUB_VALIDATION_THRESHOLD` env var (default `0.80`, matching SC-004).
+- ≥ threshold → product state `final`; `ttyd_exposed = True`. Flip is atomic: same `store.upsert_product(product)` call writes `state=final` AND `ttyd_exposed=True`. Activity-log emits `PRODUCT_PROMOTED`.
+- < threshold → product state `provisional`; `ttyd_exposed = False`. Run emits `run.needs_replan` with `suggested_agent=delivery`. Activity-log emits `PRODUCT_REGISTERED`.
+- Promotion is one-way in v1 (`provisional → final` only; never the reverse). The `SQLiteConnectionStore.upsert_product` invariant enforces this at the storage layer.
+
+**v1 validation policy**: deterministic stub — `_simulate_validation()` passes every odd-indexed question. Real LLM-as-judge (Opus 4.7) per R8 is a single-function replacement. Tests monkey-patch `_simulate_validation` to exercise both all-pass and all-fail paths.
+
+**Alternatives considered**:
+- *Roll back the Iceberg registration on partial fail*: rejected per Q5 — destroys provisioning work for a recoverable shortfall.
+- *Auto-rerun without user input*: rejected — silently spending a build cycle violates Article VIII (loading/error states must be visible).
+- *Hardcode 80%*: rejected — env-driven for future flexibility, but defaults to the spec'd line.
 
 ### D4 — Palette extension limited to two semantic-only roles (Phase 5, T089; **TBD — to amend**)
 
