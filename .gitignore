@@ -129,3 +129,25 @@ dbt_output/*/.user.yml
 # OS
 .DS_Store
 Thumbs.db
+
+# Compiled / packaged binaries (carried over from Bitbucket initial .gitignore)
+*.class
+*.jar
+*.war
+*.app
+*.exe
+target/
+
+# Logs
+*.log
+
+# Tests
+TEST*.xml
+
+# Large media (avoid accidentally committing demo recordings)
+*.mp4
+*.tiff
+*.avi
+*.flv
+*.mov
+*.wmv
