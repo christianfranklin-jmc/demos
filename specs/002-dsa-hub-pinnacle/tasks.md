@@ -113,14 +113,14 @@ description: "Task list — DSA Hub Pinnacle Cross-Source"
 
 ### Frontend implementation for US1
 
-- [ ] T039 [P] [US1] Create `frontend/src/routes/Connections.tsx` (route `/connections`) — card grid + Add Connection CTA + workspace KPI strip (FR-003, FR-004)
-- [ ] T040 [P] [US1] Create `frontend/src/components/workspace/ConnectionCard.tsx` — driver label, schema/db count, table count, last-synced ts, status pulse, per-source KPI tiles (rows scanned, tables profiled, processes detected)
-- [ ] T041 [P] [US1] Create `frontend/src/components/workspace/AddConnectionModal.tsx` — driver-specific forms for postgresql/redshift/snowflake/databricks/iceberg with field hints + secret-handling note
-- [ ] T042 [P] [US1] Create `frontend/src/components/workspace/WorkspaceKPIStrip.tsx` — animated counters (sources / tables / rows / processes / semantic entities) per US1 acceptance #1
-- [ ] T043 [P] [US1] Create `frontend/src/hooks/useWorkspace.ts` — workspace state + connection CRUD with optimistic updates + SSE/poll for status transitions
-- [ ] T044 [US1] Extend `frontend/src/context/AppContext.tsx` to carry `workspaceId`, `connections[]`, `activeLens` and a `lensOptions` derived list (default `"all"` once ≥2 connections live)
-- [ ] T045 [US1] Update `frontend/src/lib/session.ts` to expose `workspaceId` alongside the existing `sessionId` (same UUID)
-- [ ] T046 [US1] Extend `frontend/src/components/shell/ContextBar.tsx` to render the workspace switcher + active-lens selector (FR-005)
+- [X] T039 [P] [US1] Created `frontend/src/routes/Connections.tsx` — top-level Connections page: WorkspaceKPIStrip + card grid + Add Connection CTA + empty state. Uses useWorkspace; surfaces backend errors inline.
+- [X] T040 [P] [US1] Created `frontend/src/components/workspace/ConnectionCard.tsx` — driver icon + label, scope, status pulse (animated for connecting/scanning, solid for live/error), per-source KPI tiles (Tables/Rows/Processes), last-synced relative timestamp, Retry (only when error.retryable) + Remove. Status hexes inlined per ADR-020 D4.
+- [X] T041 [P] [US1] Created `frontend/src/components/workspace/AddConnectionModal.tsx` — driver picker + per-driver forms for postgresql/redshift, snowflake (incl. SSO toggle), iceberg/glue, databricks. Inline error rendering for 400/409/422.
+- [X] T042 [P] [US1] Created `frontend/src/components/workspace/WorkspaceKPIStrip.tsx` — 5 animated counters (sources/tables/rows/processes/semantic_entities) using requestAnimationFrame easing per FR-004.
+- [X] T043 [P] [US1] Created `frontend/src/hooks/useWorkspace.ts` — fetch connections + KPIs, add/remove/retry through `/workspace/*`. Adaptive polling (800ms while transitioning, 4s steady-state). Returns structured AddConnectionError with `kind: "error"` discriminator.
+- [X] T044 [US1] Extended `frontend/src/context/AppContext.tsx`: AppState gains `workspaceId`, `workspaceConnections`, `activeLens`. Two new actions (`WORKSPACE_CONNECTIONS_SET`, `LENS_SET`); reducer auto-corrects activeLens to "all" if its connection_id disappears. New helpers `deriveLensOptions()` exposed alongside `useAppState()`. SESSION_ID_SET now sets workspaceId = sessionId (Q1).
+- [X] T045 [US1] Extended `frontend/src/lib/session.ts` with `getOrMintWorkspaceId()` — returns same UUID as `getOrMintSessionId()` (Q1, FR-006).
+- [X] T046 [US1] Extended `frontend/src/components/shell/ContextBar.tsx` with `LensSelector` — renders only when ≥1 live connection; "All sources" entry appears once ≥2 are live (FR-005).
 
 **Checkpoint**: A DSA can fully drive `/connections` with two real sources; KPI strip animates as each goes live; lens selector populates. **MVP is shippable here even without the rest.**
 

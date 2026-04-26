@@ -1,7 +1,8 @@
-import { useAppState } from "../../context/AppContext";
+import { deriveLensOptions, useAppState } from "../../context/AppContext";
 import { useTheme } from "../../context/ThemeContext";
 import { disableDemoMode, enableDemoMode } from "../../lib/demoMode";
 import StatusPill from "../shared/StatusPill";
+import LensSelector from "../workspace/LensSelector";
 
 // Constitution Article V: "Backend mode MUST be visible."
 // Pulled from Vite-injected env; defaults to "local" when unset.
@@ -53,6 +54,12 @@ export default function ContextBar() {
           </span>
           <BackendModeBadge mode={BACKEND_MODE} />
           {state.demoMode.enabled && <DemoModeBadge />}
+          {/* 002-dsa-hub-pinnacle US1: lens selector renders only when ≥1 live connection. */}
+          <LensSelector
+            options={deriveLensOptions(state.workspaceConnections)}
+            value={state.activeLens}
+            onChange={(lens) => dispatch({ type: "LENS_SET", lens })}
+          />
         </div>
         <div className="flex items-center gap-3">
           <button

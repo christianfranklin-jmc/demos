@@ -29,6 +29,16 @@ export function currentSessionId(): string | null {
   return cache;
 }
 
+/**
+ * Per-tab Workspace ID — same value as the session ID (002-dsa-hub-pinnacle Q1).
+ * Exposed under a workspace-shaped name so callers that have switched to the
+ * Workspace abstraction can read a more semantically accurate identifier
+ * without a separate UUID. Backend accepts either header (FR-006).
+ */
+export function getOrMintWorkspaceId(): string {
+  return getOrMintSessionId();
+}
+
 /** Clear the current session ID. Used only by an explicit "Start new session" UI (not wired in this release). */
 export function clearSession(): void {
   cache = null;
