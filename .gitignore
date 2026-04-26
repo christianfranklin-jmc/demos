@@ -7,10 +7,70 @@ build/
 .venv/
 venv/
 
-# Environment
+# Environment — never commit real env files. Templates ending in .example
+# (and the dsa-specific frontend/.env.example.dsa) are explicitly allowed.
 .env
 .env.*
+.envrc
 !.env.example
+!frontend/.env.example
+!frontend/.env.example.dsa
+
+# Secrets / credentials / keys (defence in depth)
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+*.der
+id_rsa
+id_dsa
+id_ecdsa
+id_ed25519
+*.ppk
+*.kdbx
+.aws/credentials
+.aws/config
+**/credentials.json
+**/secrets.json
+**/secrets.yaml
+**/secrets.yml
+auth.json
+.netrc
+cookies.txt
+*.snowflake-jwt
+.snowflake/
+
+# Terraform — extra coverage (.tfvars anywhere, plan files, .terraformrc)
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+*.tfplan
+.terraformrc
+terraform.rc
+
+# Local databases — may contain real customer data
+*.db
+*.sqlite
+*.sqlite3
+*.duckdb
+
+# Generic dump / scratch files developers sometimes leak
+*.bak
+*.swp
+.scratch/
+scratch/
+
+# Python venvs (extras)
+env/
+ENV/
+
+# Node / pnpm
+.npmrc
+.yarnrc
+.yarnrc.yml
+.pnpm-store/
 
 # IDE
 .vscode/
