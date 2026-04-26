@@ -265,21 +265,25 @@ description: "Task list — DSA Hub Pinnacle Cross-Source"
 
 ### Contract tests for US5
 
-- [ ] T103 [P] [US5] Contract test: `tests/contract/test_semantic_graph.py` — exercises `GET /semantic/graph?connection_id=...` (with optional `domain` filter) and `GET /semantic/entities/{entity_id}` per `contracts/semantic.openapi.yaml`; asserts 404 for unknown connection_id
+- [X] T103 [P] [US5] Contract test: `tests/contract/test_semantic_graph.py` — 6 tests: 404 connection-not-in-workspace; empty store returns zero counts; populated store returns entities/joins/per-row counts/KPI strip; domain filter; entity detail returns entity + bindings + metrics; 404 for unknown entity_id.
 
 ### Backend implementation for US5
 
-- [ ] T104 [US5] Create `src/platform_agent/tools/semantic_graph_read.py` — `@tool` used by both this route and the redundancy-agent (US6); reads through `ConnectionStore` (T019)
-- [ ] T105 [US5] Create `src/platform_agent/tools/semantic_graph_write.py` — `@tool` used by `semantic_agent` (T074); never called by user-facing routes (FR-025 enforces no public write endpoint)
-- [ ] T106 [US5] Create `src/platform_agent/api/routes_semantic.py` implementing the two endpoints from `contracts/semantic.openapi.yaml`; computes `kpi_strip` (entities/metrics/joins/bindings/processes_mapped_pct) on the fly
-- [ ] T107 [US5] Wire `routes_semantic` into `app.py`
+- [ ] T104 [US5] `tools/semantic_graph_read.py` — DEFERRED. v1 route reads via `ConnectionStore` directly; the @tool wrapper lands with the LLM redundancy-agent (Phase 8 D2 / ADR-019).
+- [ ] T105 [US5] `tools/semantic_graph_write.py` — DEFERRED. `semantic_agent` (T074) writes via `make_store(...)` directly.
+- [X] T106 [US5] Created `src/platform_agent/api/routes_semantic.py` (~165 LOC) — `GET /semantic/graph?connection_id=...&domain=...` + `GET /semantic/entities/{entity_id}?connection_id=...`. KPI strip (entities/metrics/joins/bindings/processes_mapped_pct) computed on the fly; reads gated on workspace membership.
+- [X] T107 [US5] Wired `semantic_router` into `app.py`.
 
 ### Frontend implementation for US5
 
-- [ ] T108 [P] [US5] Create `frontend/src/routes/Semantic.tsx` (route `/semantic`) — connection switcher + per-connection KPI strip + force-directed graph + filter-by-domain + entity side panel
-- [ ] T109 [P] [US5] Create `frontend/src/components/semantic/SemanticGraph.tsx` — React Flow force-directed view; entities as nodes, joins as edges (FR-024)
-- [ ] T110 [P] [US5] Create `frontend/src/components/semantic/EntityPanel.tsx` — attributes + metrics + physical bindings detail (FR-024)
-- [ ] T111 [P] [US5] Create `frontend/src/hooks/useSemanticGraph.ts` — fetches per-connection graph, exposes connection switcher state, applies domain filter
+- [X] T108 [P] [US5] Created `frontend/src/routes/Semantic.tsx` — connection switcher + domain filter + KPI strip + force-directed graph + entity side panel. Auto-selects first live connection on mount.
+- [X] T109 [P] [US5] Created `frontend/src/components/semantic/SemanticGraph.tsx` — React Flow with custom EntityNode (domain-color ring + selected halo); circle layout heuristic; click → onSelect.
+- [X] T110 [P] [US5] Created `frontend/src/components/semantic/EntityPanel.tsx` — attributes / metrics (with definition_sql preview) / bindings.
+- [X] T111 [P] [US5] Created `frontend/src/hooks/useSemanticGraph.ts` — fetches `/semantic/graph` keyed by connection_id + domain; auto-refetches on change; `loadEntity()` for the side panel.
+
+### AppShell wiring (US5)
+
+- [X] AppShell + Sidebar gain a 🕸 Semantic top-level view alongside Workflow / Connections / Discovery / Build.
 
 **Checkpoint**: Per-connection graphs visible and navigable; no cross-connection overlay (per Q2).
 

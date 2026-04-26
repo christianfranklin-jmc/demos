@@ -9,15 +9,21 @@ import ArtifactPanel from "../artifact/ArtifactPanel";
 import Connections from "../../routes/Connections";
 import Step1Discovery from "../../routes/Step1Discovery";
 import Build from "../../routes/Build";
+import Semantic from "../../routes/Semantic";
 
 interface AppShellProps {
   onSettingsOpen: () => void;
 }
 
-// 002-dsa-hub-pinnacle US1+US2+US3: view-mode toggle so the new Connections,
-// Discovery, and Build pages coexist with the existing 4-step workflow
-// without a router.
-export type ShellView = "workflow" | "connections" | "discovery" | "build";
+// 002-dsa-hub-pinnacle US1..US5: view-mode toggle so the Connections,
+// Discovery, Build, and Semantic pages coexist with the existing 4-step
+// workflow without a router.
+export type ShellView =
+  | "workflow"
+  | "connections"
+  | "discovery"
+  | "build"
+  | "semantic";
 
 const BACKEND_URL: string =
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -103,6 +109,11 @@ export default function AppShell({ onSettingsOpen }: AppShellProps) {
           /* Provisioning DAG control room (US3) */
           <div className="flex-1 min-h-0 overflow-y-auto">
             <Build run_id={activeRunId} onBack={() => setView("discovery")} />
+          </div>
+        ) : view === "semantic" ? (
+          /* Per-connection semantic graph (US5) */
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            <Semantic />
           </div>
         ) : (
           /* Multi-source workspace (US1) */

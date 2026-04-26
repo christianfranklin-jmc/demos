@@ -5,7 +5,12 @@ import { DATA_PRODUCTS, type DataProduct } from "../../data/mock/data-products";
 import type { StepNumber, StepStatus } from "../../lib/types";
 import ConnectionForm from "./ConnectionForm";
 
-type ShellView = "workflow" | "connections" | "discovery" | "build";
+type ShellView =
+  | "workflow"
+  | "connections"
+  | "discovery"
+  | "build"
+  | "semantic";
 
 interface SidebarProps {
   onSettingsOpen: () => void;
@@ -215,6 +220,13 @@ export default function Sidebar({
             label="Build"
             isActive={view === "build"}
             onClick={() => onViewChange("build")}
+            theme={theme}
+          />
+          <SidebarNavItem
+            icon="🕸"
+            label="Semantic"
+            isActive={view === "semantic"}
+            onClick={() => onViewChange("semantic")}
             theme={theme}
           />
         </div>

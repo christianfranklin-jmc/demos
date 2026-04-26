@@ -21,6 +21,7 @@ from .routes_discover import router as discover_router
 from .routes_health import router as health_router
 from .routes_query import router as query_router
 from .routes_query_cross_source import router as query_cross_source_router
+from .routes_semantic import router as semantic_router
 from .routes_workflow import router as workflow_router
 from .routes_workflow_provision import router as workflow_provision_router
 from .routes_workspace import router as workspace_router
@@ -82,6 +83,7 @@ def create_app() -> FastAPI:
     app.include_router(workspace_discover_router)
     app.include_router(workflow_provision_router)
     app.include_router(query_cross_source_router)
+    app.include_router(semantic_router)
 
     return app
 
