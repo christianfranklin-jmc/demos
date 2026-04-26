@@ -40,3 +40,10 @@
   - Per-source row cap (250) and joined-result cap (5,000) — taken directly from user brief.
   - 7-agent provisioning DAG composition — taken directly from user brief.
   - Demo-mode parity scope — assumed full P1+P2 narrative reproducibility.
+- A `/speckit.clarify` session on 2026-04-26 resolved 5 ambiguities and recorded them in spec.md `## Clarifications`:
+  - Q1: Workspace ownership → per-tab/session (no server-side persistence beyond ephemeral cache).
+  - Q2: Durable-asset scope → per-connection (cross-connection semantic reconciliation deferred to v2+).
+  - Q3: Iceberg target acquisition → user-added explicit connection (gated; no auto-provision).
+  - Q4: PII enforcement → informational only in v1 (auto-detect/banners/masking/blocking deferred).
+  - Q5: Validation registration behavior → threshold gate at 80% (final vs. provisional product states).
+- Affected sections in spec.md after clarify: Clarifications (new), FR-001, FR-002, FR-019, FR-021, FR-022, FR-023 (reserved), FR-024, FR-025, FR-026, FR-031, FR-035, FR-037, Story 5 (rewritten), Edge Cases, SC-001, SC-004, Key Entities (Workspace, Iceberg Data Product, Semantic Entity, Physical Binding), Assumptions.

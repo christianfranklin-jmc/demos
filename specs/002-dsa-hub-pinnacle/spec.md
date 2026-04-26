@@ -5,6 +5,16 @@
 **Status**: Draft
 **Input**: Evolve the DSA Platform from a single-source workflow into a multi-source hub where two Pinnacle warehouses (operational PostgreSQL + analytical Snowflake) are auto-discovered down to their business processes, where the user can launch prebuilt "pilled" PRDs that combine both sources into governed Iceberg data products, and where every step from discovery through provisioning through validation is visualized with live KPIs and an agent DAG.
 
+## Clarifications
+
+### Session 2026-04-26
+
+- Q: What is the ownership/scope of a workspace? → A: Per-tab/session — workspace lives only in the browser session, no server-side persistence beyond cache (matches today's per-tab UUID model). One workspace per browser tab; closing the tab discards the workspace state.
+- Q: What identifier scopes the durable, cross-session assets (semantic graph, registered Iceberg catalog, activity log)? → A: Per-connection — each connection owns its own semantic graph and its own catalog; the platform does NOT reconcile entities across connections in v1. Cross-source data products are still produced (provisioning joins data from multiple connections at build time and writes to an Iceberg connection's catalog), but a single business concept that appears in two source connections (e.g., a `clients` dimension in Postgres and a `dim_client` in Snowflake) remains as two separate entities in two separate per-connection graphs. **Future consideration (v2+):** evolve toward a workspace-level or project/firm-level unified graph that reconciles entities across connections — both the workspace-scoped (Q2 option 2) and project/firm-scoped (Q2 option C) approaches are on the roadmap, but explicitly out of scope for this feature.
+- Q: How does a workspace get a target Iceberg/Glue catalog connection for provisioning? → A: The user must add an Iceberg/Glue catalog connection as an explicit third connection in the workspace; provisioning is gated on its presence and fails fast with a "Add Iceberg target connection" prompt if absent. For the live Pinnacle demo, the Iceberg/Glue connection MAY be pre-staged in the workspace so the DSA only visibly adds the two source connections (Postgres + Snowflake) during the 8-minute showcase, but the platform itself requires the Iceberg connection to exist before any PRD acceptance can proceed.
+- Q: How are PII/PCI/PHI tags enforced in v1? → A: Informational only — the Standards page lists the policy (categories, definitions, expected handling) but the platform does NOT auto-detect candidate PII columns, does NOT surface tag banners in TTYD responses, does NOT log tag touches in the activity log, and does NOT mask or block at any query path in v1. Auto-detect, banners + logging, masking, and blocking are all on the v2+ roadmap; the v1 data model intentionally does not preclude any of them.
+- Q: What is the registration behavior when the auto-validation card is partially red? → A: Threshold gate — provisioning registers the Iceberg product as **final and TTYD-queryable** only when ≥ 80% of the PRD's stated business questions pass (the same line named in SC-004). Below threshold, the product is registered in a **provisional** state, NOT exposed to TTYD, and the run remains on the Build page in a "needs re-plan" status; only a successful rerun (whole or per-failed-question) that lifts the pass rate to ≥ 80% promotes the product to final. Threshold value is configurable but defaults to 80%.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 — Connect both Pinnacle warehouses and see them as one company (Priority: P1)
@@ -78,20 +88,20 @@ Once a workspace has 2+ connections, the DSA switches the active lens to "all Pi
 
 ---
 
-### User Story 5 — Build a shared semantic layer that grows with each PRD (Priority: P3)
+### User Story 5 — Build per-connection semantic graphs that grow with each PRD (Priority: P3)
 
-As PRDs ship, a Semantic Layer page accumulates the entities, attributes, metrics, joins, and physical bindings produced by each provisioning run. Two physical tables that represent the same business concept across sources (e.g., a `clients` dimension in Postgres and a `dim_client` in Snowflake) are reconciled into a single entity with two physical bindings. The DSA can browse a force-directed graph of entities/joins, filter by source or domain, and inspect each entity's attributes, metrics, and bindings.
+As PRDs ship, each connection's semantic graph accumulates the entities, attributes, metrics, joins, and physical bindings produced by provisioning runs that wrote to that connection's catalog. The DSA can browse a force-directed graph of entities/joins per connection, filter within a graph by domain, and inspect each entity's attributes, metrics, and bindings. Cross-connection reconciliation (merging "the same business concept" across connections into one entity) is **not** performed in v1 — entities remain scoped to the connection that owns them. Cross-source data products materialize into a target Iceberg/catalog connection and live as new entities in *that* connection's graph.
 
-**Why this priority**: The semantic layer is the compounding asset that makes redundancy gates and cross-source queries smarter over time. P3 because it accumulates value across runs but a single demo does not require it to be richly populated — Stories 1–4 stand alone for a first run.
+**Why this priority**: The per-connection semantic graph is the compounding asset that makes the redundancy gate (Story 6) work and lets the TTYD planner reuse approved metrics. P3 because it accumulates value across runs but a single demo does not require it to be richly populated — Stories 1–4 stand alone for a first run.
 
-**Independent Test**: After at least one provisioning run completes, the Semantic page shows ≥1 entity with ≥2 physical bindings (one per source), the graph renders without errors, and filtering by source narrows the visible nodes.
+**Independent Test**: After at least one provisioning run completes, the Semantic page shows ≥1 entity in the target connection's graph with ≥1 physical binding, the graph renders without errors, and the connection switcher lets the DSA inspect each connection's graph independently.
 
 **Acceptance Scenarios**:
 
-1. **Given** a successful provisioning run, **When** the semantic-agent step completes, **Then** the produced entities and metrics appear in the Semantic page within 5 seconds.
-2. **Given** two physical tables represent the same business concept across sources, **When** reconciliation runs, **Then** they are merged into one entity with two physical bindings (not duplicated).
-3. **Given** a populated semantic graph, **When** the DSA filters by source or domain, **Then** the graph and KPI strip update to show only matching entities/metrics.
-4. **Given** a reconciliation pass produces ambiguous matches, **When** results are returned, **Then** they are surfaced as a diff awaiting human approval rather than auto-merged.
+1. **Given** a successful provisioning run that wrote to a target Iceberg connection, **When** the semantic-agent step completes, **Then** the produced entities and metrics appear in *that connection's* graph on the Semantic page within 5 seconds.
+2. **Given** two source connections both contain a similarly-named business concept, **When** the DSA opens the Semantic page, **Then** the two concepts appear as separate entities in their respective per-connection graphs and are NOT auto-merged. (Future-considered: cross-connection reconciliation is on the v2 roadmap.)
+3. **Given** a populated per-connection graph, **When** the DSA filters by domain, **Then** the graph and KPI strip update to show only matching entities/metrics within that connection.
+4. **Given** the DSA wants to compare concepts across connections, **When** they switch the active connection in the Semantic page, **Then** the view reloads to that connection's graph; no cross-connection overlay is rendered in v1.
 
 ---
 
@@ -137,7 +147,9 @@ A read-only Standards page exposes the firm's enterprise conventions: naming rul
 - **Schema drift mid-run**: A source's schema changes between discovery and provisioning. The provisioning orchestrator detects the drift, halts at the affected agent, and surfaces a re-discover prompt rather than producing a corrupt artifact.
 - **Cross-source query returns empty join**: The scratchpad join produces zero rows. The response explains the empty result with per-source row counts so the DSA can see whether the issue is upstream filtering, key mismatch, or no overlap.
 - **PRD acceptance with no semantic graph yet**: First-ever PRD on a fresh install. Redundancy gate returns 🟢 net new without errors; validation runs normally.
-- **Validation question is unanswerable from the new Iceberg asset alone**: The card marks the row ✗ with the reason "required column missing in product" and offers Re-plan.
+- **PRD acceptance with no Iceberg target connection in the workspace**: The platform blocks acceptance with an "Add Iceberg target connection" prompt rather than silently failing or auto-creating a target. Once the user adds an Iceberg/Glue connection, the same PRD can be accepted without re-drafting.
+- **Validation question is unanswerable from the new Iceberg asset alone**: The card marks the row ✗ with the reason "required column missing in product" and offers Re-plan. If overall pass rate falls below the FR-031 threshold (default 80%), the product is registered as **provisional** and not yet exposed to TTYD.
+- **Validation passes the threshold but some questions still red**: The product is registered as **final** and TTYD-queryable; the ✗ rows remain on the Validation Card and in the activity log as known gaps, and the DSA can choose to re-plan or accept the gap.
 - **Demo mode (offline)**: A canned Pinnacle multi-source scenario satisfies all P1/P2 acceptance scenarios without any live database or cloud account.
 - **Existing single-source sessions**: Sessions started before the multi-source upgrade continue to work for one minor version (back-compat alias for the prior session-key field).
 - **Pill generation against non-Pinnacle data**: Pills reflect the actual discovered schema, not the Pinnacle examples.
@@ -150,8 +162,8 @@ A read-only Standards page exposes the firm's enterprise conventions: naming rul
 
 #### Workspace & Connections
 
-- **FR-001**: The platform MUST support a workspace abstraction that owns 1..N source connections; single-source operation is a degenerate case of a workspace with one connection.
-- **FR-002**: The platform MUST allow the user to add, list, and remove connections from a workspace, with at minimum the following first-class driver families: PostgreSQL/RDS, Snowflake, Redshift, Databricks, and Iceberg (Glue Catalog).
+- **FR-001**: The platform MUST support a workspace abstraction that owns 1..N source connections; single-source operation is a degenerate case of a workspace with one connection. Workspace scope is **per-browser-tab/session**: one workspace per tab, identified by the existing per-tab session UUID, with no server-side persistence of the workspace itself beyond ephemeral cache; closing the tab discards workspace state. Long-lived assets that need to survive a tab close (semantic graph, registered Iceberg data products, activity-log audit records) are persisted independently and keyed by their own identifiers, not by the workspace ID.
+- **FR-002**: The platform MUST allow the user to add, list, and remove connections from a workspace, with at minimum the following first-class driver families: PostgreSQL/RDS, Snowflake, Redshift, Databricks, and Iceberg (Glue Catalog). Iceberg/Glue catalog connections are first-class connections explicitly added by the user; the platform does NOT auto-provision a default target catalog.
 - **FR-003**: Each connection card MUST display driver label, schema/database count, table count, last-synced timestamp, live/error status, and per-source KPI tiles (rows scanned, tables profiled, processes detected).
 - **FR-004**: A workspace KPI strip MUST display merged totals across all live connections (sources connected, total tables, total rows, processes detected, semantic entities derived) and animate as connections come online.
 - **FR-005**: The platform MUST provide a workspace-level lens selector with at least "all sources" plus one entry per connection, scoped by schema/database.
@@ -174,37 +186,37 @@ A read-only Standards page exposes the firm's enterprise conventions: naming rul
 - **FR-016**: For cross-source questions, the platform MUST pull bounded subsets per source and combine them in an in-process scratchpad before returning the answer.
 - **FR-017**: The TTYD response MUST surface per-source chips (driver, scope, row count) and a scratchpad/join chip; expandable details MUST include per-step SQL and any semantic entities/metrics referenced.
 - **FR-018**: Read-only enforcement MUST block any non-SELECT/non-WITH statement at every query path, and the system MUST cap per-source pulls at 250 rows and joined results at 5,000 rows.
-- **FR-019**: The TTYD planner MUST consult the semantic layer before query construction; existing metric definitions MUST be reused rather than redefined, and reuse MUST be reported in the response.
+- **FR-019**: The TTYD planner MUST consult the relevant connection(s)' semantic graphs before query construction (the source connection for single-source questions; the target Iceberg connection for questions answered from already-built data products). Existing metric definitions in the consulted graph MUST be reused rather than redefined, and reuse MUST be reported in the response.
 - **FR-020**: A TTYD KPI strip MUST display: queries answered, average latency, sources used today, and semantic-layer hit rate.
 
 #### Semantic Layer
 
-- **FR-021**: The platform MUST maintain a persistent, versioned semantic graph composed of entities, attributes, metrics, joins, and physical bindings (one binding per source × table backing the entity).
-- **FR-022**: When a single business concept appears across sources with shared business keys, the platform MUST reconcile them into one entity with multiple physical bindings rather than duplicating the entity.
-- **FR-023**: Reconciliation results that are ambiguous MUST be surfaced as a human-approval diff rather than auto-applied.
-- **FR-024**: A Semantic page MUST render the graph as a force-directed view with filters by source and by data domain, plus a header KPI strip (entities, metrics, joins, bindings, sources covered, % of detected processes mapped).
-- **FR-025**: The semantic layer MUST be read-only via the UI; writes occur only through the PRD acceptance/provisioning flow.
+- **FR-021**: The platform MUST maintain a persistent, versioned semantic graph **per connection**, composed of entities, attributes, metrics, joins, and physical bindings local to that connection. Each connection owns its own graph; durable storage is keyed by a stable connection identifier so the graph survives tab close.
+- **FR-022**: The platform MUST NOT auto-reconcile entities across connections in v1. A business concept that appears in two source connections (e.g., a `clients` dimension in Postgres and a `dim_client` in Snowflake) remains as two separate entities in two separate per-connection graphs. Cross-source data products are still produced via provisioning (Story 3), but the resulting entities live only in the target Iceberg/catalog connection's graph. *Future consideration: v2+ may introduce a workspace-level or project/firm-level unified graph that reconciles across connections.*
+- **FR-023**: *(reserved — was: reconciliation diff for ambiguous cross-source matches; deferred with FR-022 to v2+)*
+- **FR-024**: A Semantic page MUST render each connection's graph as a force-directed view, with a connection switcher to move between graphs and a per-graph filter by data domain. A per-connection header KPI strip MUST display entities, metrics, joins, bindings, and % of that connection's detected processes mapped.
+- **FR-025**: The semantic layer MUST be read-only via the UI; writes occur only through the PRD acceptance/provisioning flow, which writes to the target connection's graph.
 
 #### Redundancy Gate & Provisioning
 
-- **FR-026**: Between PRD draft and acceptance, the platform MUST run a redundancy check against the semantic graph and return a report with three states: net-new (proceed), partial overlap (require reuse-or-override decision), full duplicate (block unless override rationale recorded).
+- **FR-026**: Between PRD draft and acceptance, the platform MUST run a redundancy check against the **target connection's** semantic graph (the connection where the new product will be materialized — typically an Iceberg/catalog connection) and return a report with three states: net-new (proceed), partial overlap (require reuse-or-override decision), full duplicate (block unless override rationale recorded). The check does NOT scan source connections' graphs in v1.
 - **FR-027**: PRD acceptance MUST initiate a provisioning run executing at least 7 agent steps in dependency order: schema, pipeline, model, quality, mapping (Iceberg/catalog registration), semantic, delivery.
 - **FR-028**: Provisioning MUST stream live progress events such that a Build page can render a DAG with per-node states (active/complete/failed), produced artifacts on completion, and inline retry on failure.
 - **FR-029**: A failed agent MUST be retryable in isolation; only its downstream dependents (not completed upstream work) re-execute.
 - **FR-030**: The Build page MUST display live KPI tiles: rows in motion, agents active, pipeline latency p95, files written, estimated cost, and ETA — driven from the same provisioning event stream.
-- **FR-031**: Provisioning MUST terminate by registering the declared Iceberg data product in the project's catalog and exposing it as a TTYD-queryable source.
+- **FR-031**: Provisioning MUST terminate by registering the declared Iceberg data product in the workspace's user-added Iceberg/Glue catalog connection. The product is registered as **final and TTYD-queryable** only if the auto-validation pass rate (FR-033) is ≥ a configurable threshold (defaulting to 80%, matching SC-004). If the pass rate is below threshold, the product MUST be registered in a **provisional** state — present in the catalog and visible in the Semantic page and activity log, but NOT exposed as a TTYD-queryable source until a subsequent rerun lifts the pass rate to ≥ threshold. PRD acceptance MUST be gated on the workspace containing at least one live Iceberg/Glue connection; if none is present, the platform MUST surface an "Add Iceberg target connection" prompt and block provisioning rather than silently fail or auto-create a target.
 - **FR-032**: A workspace activity log MUST capture the full chain — discovery → pill click → PRD → redundancy decision → provisioning → validation — as the audit trail for the run.
 
 #### Auto-Validation (Prove-It Loop)
 
 - **FR-033**: After provisioning completes, the platform MUST automatically run each business question listed in the PRD against the new Iceberg asset via cross-source TTYD.
 - **FR-034**: A Validation Card MUST display each question with an in-progress spinner that resolves to ✓ or ✗; clicking a row MUST reveal the SQL run and a result preview.
-- **FR-035**: A failed validation MUST expose a "Re-plan" affordance returning to Step 4 with the failed question loaded as context.
+- **FR-035**: A failed validation MUST expose a "Re-plan" affordance returning to Step 4 with the failed question loaded as context. When the run's pass rate is below the registration threshold (FR-031), the Build page MUST surface a "needs re-plan" status banner and a "Re-run from failed step" affordance that re-executes only the failed-question path (not full provisioning) where possible. A successful rerun that lifts the pass rate to ≥ threshold MUST promote the previously-provisional product to final and expose it to TTYD.
 - **FR-036**: A validation KPI strip MUST display: questions auto-validated, % passing, average query latency, semantic-layer hit rate, and Iceberg scan bytes.
 
 #### Standards
 
-- **FR-037**: A read-only Standards page MUST expose at least six categories: naming conventions, approved metric definitions, PII/PCI/PHI tagging policy, dbt project templates, approved data domains, and Iceberg table standards.
+- **FR-037**: A read-only Standards page MUST expose at least six categories: naming conventions, approved metric definitions, PII/PCI/PHI tagging policy (informational only in v1 — see Clarifications Q4), dbt project templates, approved data domains, and Iceberg table standards.
 - **FR-038**: PRD generation in Step 1 MUST consult Standards and produce drafts conformant with them; every generated PRD MUST end with a "Standards applied" footer enumerating which standards were enforced.
 
 #### Cross-Cutting
@@ -217,16 +229,16 @@ A read-only Standards page exposes the firm's enterprise conventions: naming rul
 
 ### Key Entities *(include if feature involves data)*
 
-- **Workspace**: A user's working context. Owns N connections, owns the activity log, scopes the lens selector. Replaces the prior scalar source-id concept as the session key.
+- **Workspace**: A per-browser-tab working context, identified by the existing per-tab session UUID. Owns N connections in-memory for the lifetime of the tab and scopes the lens selector. Has no server-side persistence beyond ephemeral cache; durable assets (semantic graph entries, registered Iceberg products, audit-log entries) survive tab close via their own persistence layers, not via the workspace.
 - **Connection**: A live binding to a single source warehouse (driver type, credentials reference, scope, last-synced timestamp, status). Contributes its discovered tables and processes to the workspace.
 - **Business Process**: A domain-level activity inferred from schema + data (e.g., Accounts Payable). Carries source backings, volume signal, last-activity timestamp, sparkline series.
 - **Pilled PRD**: A schema-grounded suggestion for a cross-source data product. Carries title, source backings, declared Iceberg target, estimated build time, and seeds for the PRD body.
 - **PRD (Product Requirements Doc)**: A persisted draft containing identified joins, declared materialization target, business questions, and a Standards-applied footer. Inputs to redundancy gate and provisioning.
 - **Redundancy Report**: The output of the gate between PRD draft and acceptance: state (net-new/partial/duplicate), overlapping entities/metrics, reuse-or-override decisions captured.
 - **Provisioning Run**: A single execution of the agent pipeline. Carries run ID, agent states, produced artifacts, KPI series, and terminal status. One per accepted PRD.
-- **Iceberg Data Product**: The terminal artifact of a provisioning run — a registered, queryable Iceberg table with associated dbt models, semantic-graph entries, and TTYD exposure.
-- **Semantic Entity**: A business concept (e.g., Client) with attributes, metrics, joins, and N physical bindings (one per source backing it).
-- **Physical Binding**: A specific source × table × column-map that backs a semantic entity.
+- **Iceberg Data Product**: The terminal artifact of a provisioning run — a registered Iceberg table with associated dbt models, semantic-graph entries, and (when validation passes the threshold) TTYD exposure. Has two states: **final** (≥ threshold validation pass rate; TTYD-queryable) and **provisional** (below threshold; not TTYD-queryable; promotable on successful rerun).
+- **Semantic Entity**: A business concept (e.g., Client) with attributes, metrics, joins, and ≥1 physical bindings — **scoped to a single connection** in v1. The same business concept appearing in two connections produces two separate entities.
+- **Physical Binding**: A specific table × column-map within a single connection that backs a semantic entity.
 - **Validation Result**: The auto-run answer to one PRD business question (✓/✗, SQL, result preview, latency).
 - **Workspace Activity Log Entry**: A timestamped record of a workflow event (connection added, discovery completed, pill clicked, PRD accepted, agent state change, validation result), forming the audit trail.
 
@@ -234,10 +246,10 @@ A read-only Standards page exposes the firm's enterprise conventions: naming rul
 
 ### Measurable Outcomes
 
-- **SC-001**: A DSA can complete the full Pinnacle showcase narrative — connect both sources, discover, pick a pill, accept through the redundancy gate, watch provisioning, see the Validation Card go green, and ask a fresh cross-source TTYD question against the new product — in under 8 minutes live.
+- **SC-001**: A DSA can complete the full Pinnacle showcase narrative — connect both source warehouses (Postgres + Snowflake; the Iceberg/Glue target connection MAY be pre-staged in the workspace ahead of the live demo), discover, pick a pill, accept through the redundancy gate, watch provisioning, see the Validation Card go green, and ask a fresh cross-source TTYD question against the new product — in under 8 minutes live.
 - **SC-002**: From a fresh workspace, the time from "second connection added" to "all 8 Pinnacle business processes visible as cards" is under 60 seconds at the seeded data volumes.
 - **SC-003**: At least 6 schema-grounded pills appear on Step 1 for the Pinnacle dataset; the rate at which a pill click yields a complete cross-source PRD draft (with target, joins, business questions) is 100%.
-- **SC-004**: Provisioning a pilled PRD produces a registered Iceberg table queryable from TTYD; the run's Validation Card reports ≥ 80% green on the PRD's stated business questions on the first run.
+- **SC-004**: Provisioning a pilled PRD produces a registered Iceberg table; the run's Validation Card reports ≥ 80% green on the PRD's stated business questions on the first run, which clears the registration threshold (FR-031) and exposes the product as TTYD-queryable. Below-threshold runs register the product as **provisional** (catalog-visible, semantic-graph-recorded, but not TTYD-queryable until a successful rerun lifts the pass rate).
 - **SC-005**: Cross-source TTYD answers a question requiring both Pinnacle sources within 5 seconds at the seeded data volumes, with per-source chips and a scratchpad/join chip surfaced in the response.
 - **SC-006**: Read-only enforcement blocks 100% of attempted write statements across every query path (TTYD, scan, profile) without ever forwarding them to a source.
 - **SC-007**: Single-source workflow regression: 100% of the prior pytest + vitest suite continues to pass after the workspace rename, with no new flakes attributable to the multi-source rework.
@@ -256,6 +268,6 @@ A read-only Standards page exposes the firm's enterprise conventions: naming rul
 - The user driving the demo is technical (DSA / data engineer), not an end business user — the UX optimizes for "show your work" credibility, not consumer simplicity.
 - Existing dark-theme aesthetic (Instrument Serif headers, JetBrains Mono body, established accent palette) is preserved; this feature does not introduce a new design system.
 - AWS profile, region, and Bedrock model availability follow the pre-existing project conventions (see CLAUDE.md). Snowflake authentication via SSO/externalbrowser remains the supported path for live demos.
-- Per-user RBAC on the semantic graph, write-back to source systems beyond DDL extensions and new tables, additional cost optimization beyond MetricFlow + Iceberg defaults, and a standalone Iceberg-suite UI are explicitly out of scope.
+- Per-user RBAC on the semantic graph, write-back to source systems beyond DDL extensions and new tables, additional cost optimization beyond MetricFlow + Iceberg defaults, a standalone Iceberg-suite UI, **cross-connection semantic reconciliation** (auto-merging the same business concept across two source connections into one unified entity), and **active PII/PCI/PHI enforcement** (auto-detection, response banners, activity-log tag tracking, masking, blocking) are explicitly out of scope for v1. Cross-connection reconciliation is on the v2+ roadmap as either a workspace-level or a project/firm-level unified graph; PII enforcement is on the v2+ roadmap as a layered scope (tag → display + log → mask → block). The v1 data model intentionally does not preclude either path.
 - The provisioning orchestrator's underlying agents (schema, pipeline, model, quality, mapping) already exist in the migration-suite codebase and are reused; semantic and delivery are net-new but follow the same agent contract.
 - ADRs 016–021 (or equivalent numbering at implementation time) will be authored in-flight per constitution Addendum E for the six major architectural decisions (multi-connection workspace, semantic graph storage, cross-source query approach, redundancy gate, provisioning orchestration into Iceberg, pill generation).
