@@ -20,12 +20,12 @@ description: "Task list — DSA Hub Pinnacle Cross-Source"
 
 **Purpose**: Project initialization for the new feature.
 
-- [ ] T001 Add new Python deps via `uv add duckdb pyiceberg dbt-glue` in `pyproject.toml`; lock with `uv lock`; verify `uv pip install -e ".[dev,redshift,snowflake,otel]"` still resolves cleanly
-- [ ] T002 [P] Add new env-var documentation to `.env.example`: `STORAGE_BACKEND`, `DSA_HUB_VALIDATION_THRESHOLD`, `DSA_HUB_DUCKDB_JOIN_CAP`, `DSA_HUB_SOURCE_PULL_CAP`, `ICEBERG_DEFAULT_GLUE_DB`, `DSA_HUB_DEMO_MODE` (per `quickstart.md` §3)
-- [ ] T003 [P] Configure ruff + mypy strict for new module roots in `pyproject.toml`: add `src/platform_agent/workspace/`, `src/platform_agent/provisioning/`, `src/platform_agent/semantic/` to mypy strict allow-list (Constitution Article III)
-- [ ] T004 [P] Create empty package skeletons with `__init__.py` files for: `src/platform_agent/workspace/`, `src/platform_agent/provisioning/`, `src/platform_agent/provisioning/agents/`, `src/platform_agent/semantic/`, `src/platform_agent/semantic/migrations/`
-- [ ] T005 [P] Frontend: ensure `react-flow` (or `@xyflow/react`) is on the lockfile in `frontend/package.json`; add it via `pnpm add` if not already there (used by both Build-page DAG and Semantic-page graph)
-- [ ] T006 [P] Add `frontend/src/lib/agentcore-client/parsers/v2/` directory with a stub `index.ts` that re-exports the v1 parser API (additive extension; v2 parser is fleshed out under US3)
+- [X] T001 Add new Python deps via `uv add duckdb pyiceberg dbt-glue` in `pyproject.toml`; lock with `uv lock`; verify `uv pip install -e ".[dev,redshift,snowflake,otel]"` still resolves cleanly
+- [X] T002 [P] Add new env-var documentation to `.env.example`: `STORAGE_BACKEND`, `DSA_HUB_VALIDATION_THRESHOLD`, `DSA_HUB_DUCKDB_JOIN_CAP`, `DSA_HUB_SOURCE_PULL_CAP`, `ICEBERG_DEFAULT_GLUE_DB`, `DSA_HUB_DEMO_MODE` (per `quickstart.md` §3)
+- [X] T003 [P] Configure ruff + mypy strict for new module roots in `pyproject.toml`: add `src/platform_agent/workspace/`, `src/platform_agent/provisioning/`, `src/platform_agent/semantic/` to mypy strict allow-list (Constitution Article III)
+- [X] T004 [P] Create empty package skeletons with `__init__.py` files for: `src/platform_agent/workspace/`, `src/platform_agent/provisioning/`, `src/platform_agent/provisioning/agents/`, `src/platform_agent/semantic/`, `src/platform_agent/semantic/migrations/`
+- [X] T005 [P] Frontend: ensure `react-flow` (or `@xyflow/react`) is on the lockfile in `frontend/package.json`; add it via `pnpm add` if not already there (used by both Build-page DAG and Semantic-page graph) — verified `@xyflow/react ^12.10.2` already present
+- [X] T006 [P] Add `frontend/src/lib/agentcore-client/parsers/v2/` directory with a stub `index.ts` that re-exports the v1 parser API (additive extension; v2 parser is fleshed out under US3)
 
 ---
 
