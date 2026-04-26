@@ -122,8 +122,11 @@ export default function Sidebar({ onSettingsOpen }: SidebarProps) {
           {theme.sidebar.workflowFolderLabel}
         </p>
 
-        {/* Data products list */}
-        {DATA_PRODUCTS.map((product) => (
+        {/* Active data product only — the static demo cohort
+            (Customer Churn / Revenue Attribution / etc.) is replaced by the
+            "How this works" explainer below to keep the sidebar focused on
+            the live workflow. */}
+        {DATA_PRODUCTS.filter((p) => p.id === "dp-romi-001").map((product) => (
           <div key={product.id}>
             <button
               onClick={() => handleProductClick(product)}
@@ -197,6 +200,67 @@ export default function Sidebar({ onSettingsOpen }: SidebarProps) {
             )}
           </div>
         ))}
+
+        {/* "How this works" explainer — replaces the static demo product
+            cohort. Two short sections: the 4-step PRD flow and Talk to Data. */}
+        <div
+          className="mt-3 mx-1 px-3 py-3 rounded text-xs leading-relaxed"
+          style={{
+            background: theme.colors.surfaceInput,
+            border: `1px solid ${theme.colors.borderSubtle}`,
+            color: theme.colors.textPrimary,
+          }}
+        >
+          <p
+            className="text-[11px] uppercase tracking-wider mb-2"
+            style={{ color: theme.colors.textTertiary }}
+          >
+            How this works
+          </p>
+
+          <p
+            className="font-semibold mb-1"
+            style={{ color: theme.colors.textPrimary }}
+          >
+            Build a PRD in 4 steps
+          </p>
+          <ol
+            className="list-decimal pl-4 mb-3 space-y-1"
+            style={{ color: theme.colors.textSecondary }}
+          >
+            <li>
+              <span style={{ color: theme.colors.textPrimary }}>Requirements</span> — the
+              agent scans the connected source and drafts a PRD grounded in the real
+              tables and discovered business processes.
+            </li>
+            <li>
+              <span style={{ color: theme.colors.textPrimary }}>Conceptual model</span> —
+              entities and relationships derived from the live foreign-key graph.
+            </li>
+            <li>
+              <span style={{ color: theme.colors.textPrimary }}>Logical model</span> —
+              typed tables with sample values pulled live from each column.
+            </li>
+            <li>
+              <span style={{ color: theme.colors.textPrimary }}>Detailed requirements</span> —
+              a downloadable dbt project + semantic layer.
+            </li>
+          </ol>
+
+          <p
+            className="font-semibold mb-1"
+            style={{ color: theme.colors.textPrimary }}
+          >
+            Talk to your data
+          </p>
+          <p style={{ color: theme.colors.textSecondary }}>
+            Once a PRD field is filled, the artifact panel exposes a{" "}
+            <span style={{ color: theme.colors.textPrimary }}>Talk to Data</span> tab. Ask
+            plain-English questions; the agent writes SELECT queries against the
+            connected source, joins across tables as needed, and returns the rows
+            alongside the SQL it ran.
+          </p>
+        </div>
       </nav>
 
       {/* 001-dsa-agent-integration: source-database connection form. */}

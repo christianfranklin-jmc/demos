@@ -32,7 +32,7 @@ export default function GraphView({ stepNumber }: GraphViewProps) {
       case 1: {
         const prd = state.artifacts.prd;
         if (!prd.source_systems || prd.source_systems.length === 0) return null;
-        return buildSourceGraph(prd);
+        return buildSourceGraph(prd, state.sourceContext?.productName);
       }
       case 2: {
         const model = state.artifacts.conceptual;
@@ -52,7 +52,7 @@ export default function GraphView({ stepNumber }: GraphViewProps) {
       default:
         return null;
     }
-  }, [stepNumber, state.artifacts]);
+  }, [stepNumber, state.artifacts, state.sourceContext]);
 
   if (!graphData) {
     return <EmptyState stepNumber={stepNumber} tabName="Visual" />;

@@ -95,7 +95,7 @@ export default function PRDView() {
         className="flex items-center gap-4 px-4 py-3 border-b text-xs"
         style={{ borderColor: theme.colors.borderSubtle, color: theme.colors.textSecondary }}
       >
-        <span>{theme.scenario.dataProductName}</span>
+        <span>{state.sourceContext?.productName || theme.scenario.dataProductName}</span>
         <span>&middot;</span>
         <span>v0.3</span>
         <span>&middot;</span>

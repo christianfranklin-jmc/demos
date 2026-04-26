@@ -117,11 +117,21 @@ export function useAgent(): void {
     if (!stepId) return; // step 0 (stakeholders) is out of scope for the backend
 
     // Fire-and-track the backend call. We do not await — this is an effect.
+    // Pull domain from the discovery payload — first business process name
+    // is the most representative label (e.g. "Order Management" for
+    // Northwinds, "Client Portfolio Analytics" for Pinnacle). Falls back to
+    // the domain summary, then a generic label.
+    const dataDomain =
+      state.sourceContext?.businessProcesses?.[0]?.name ||
+      state.sourceContext?.domainSummary ||
+      null;
     inFlightRef.current = runStep(stepId, message.message_text, {
       sessionId: state.sessionId,
       connection: state.connection,
       dispatch,
       currentStep: message.step,
+      driverType: state.connection?.driver_type ?? null,
+      dataDomain,
     });
     currentController = inFlightRef.current;
 
@@ -146,6 +156,10 @@ interface RunStepContext {
   connection: StepRequest["connection"];
   dispatch: ReturnType<typeof useAppState>["dispatch"];
   currentStep: number;
+  /** Driver type ("postgresql" | "redshift" | "snowflake") for source-system labels. */
+  driverType: string | null;
+  /** Discovered domain summary, used as the data_domain for source systems. */
+  dataDomain: string | null;
 }
 
 /**
@@ -223,10 +237,21 @@ export function runStep(
       if (abortCtl.signal.aborted) return;
       const message = err instanceof Error ? err.message : String(err);
       console.error("runStep error:", message);
-      // T064: auto-fallback to demo mode so the demo keeps moving even when
-      // the backend is unreachable. The DEMO_MODE_AUTO_ENABLE reducer action
-      // stamps the reason so the UI can distinguish it from a user toggle.
-      ctx.dispatch({ type: "DEMO_MODE_AUTO_ENABLE" });
+      // Surface as a chat-visible error so the user knows what happened. We
+      // intentionally do NOT auto-enable demo mode here — that proved
+      // confusing across three sessions (Snowflake SSO timeouts, slow
+      // Bedrock responses, and HTTP rejects all silently flipped the UI
+      // into pre-scripted mode). Demo mode is now user-toggle only.
+      ctx.dispatch({
+        type: "ADD_MESSAGE",
+        message: {
+          data_product_id: "live",
+          step: ctx.currentStep,
+          message_role: "agent",
+          message_text: `⚠️ Backend call failed: ${message}. Check the connection details, then retry. Toggle "Demo mode" if you'd like to use the pre-scripted flow.`,
+          timestamp: new Date().toISOString(),
+        } as any,
+      });
     } finally {
       silence?.dispose();
       ctx.dispatch({ type: "SET_AGENT_THINKING", thinking: false });
@@ -278,7 +303,10 @@ function handleEvent(event: SSEEventV1, ctx: RunStepContext): void {
         // suggestion refines the spec instead of clobbering it.
         ctx.dispatch({
           type: "APPEND_PRD",
-          updates: prdFromBackend(event.payload as PrdPayload),
+          updates: prdFromBackend(event.payload as PrdPayload, {
+            driverType: ctx.driverType,
+            dataDomain: ctx.dataDomain,
+          }),
         });
       } else if (event.artifact_type === "conceptual_model") {
         ctx.dispatch({

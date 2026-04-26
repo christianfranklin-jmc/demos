@@ -13,16 +13,19 @@ import { ENTITY_COLORS } from "./constants";
 
 // ─── Step 1: Source System Graph ───
 
-export function buildSourceGraph(prd: PRDArtifact): { nodes: Node[]; edges: Edge[] } {
+export function buildSourceGraph(
+  prd: PRDArtifact,
+  productName: string = "ROMI Data Product",
+): { nodes: Node[]; edges: Edge[] } {
   const nodes: Node[] = [];
   const edges: Edge[] = [];
 
-  // Center node: the data product
+  // Center node: the data product (label from sourceContext when available).
   nodes.push({
     id: "product",
     type: "sourceNode",
     position: { x: 300, y: 200 },
-    data: { label: "ROMI Data Product", type: "product", quality: null },
+    data: { label: productName, type: "product", quality: null },
   });
 
   const sources = prd.source_systems || [];

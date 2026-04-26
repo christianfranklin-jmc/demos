@@ -12,7 +12,7 @@ import type {
   SourceConnection,
   DemoModeState,
   MemoryStatus,
-  SourceContext,
+  DiscoveredSource,
 } from "../lib/types";
 import { DEMO_PRODUCT } from "../lib/constants";
 import { createEmptyPRD } from "../lib/scoring";
@@ -40,7 +40,7 @@ interface AppState {
   connection: SourceConnection | null; // Request-scoped DB connection; never persisted.
   demoMode: DemoModeState;             // Frontend-only fallback switch (ADR-015 D13).
   memoryStatus: MemoryStatus;          // FR-030 banner driver.
-  sourceContext: SourceContext | null; // Post-connection discovery (ADR-015 D18).
+  sourceContext: DiscoveredSource | null; // Post-connection discovery (ADR-015 D18).
 }
 
 // ─── Actions ───
@@ -74,7 +74,7 @@ type AppAction =
   | { type: "DEMO_MODE_DISABLE" }
   | { type: "DEMO_MODE_AUTO_ENABLE" }
   | { type: "MEMORY_STATUS_SET"; status: MemoryStatus }
-  | { type: "SOURCE_CONTEXT_SET"; context: SourceContext }
+  | { type: "SOURCE_CONTEXT_SET"; context: DiscoveredSource }
   | { type: "SOURCE_CONTEXT_CLEAR" }
   | { type: "WORKFLOW_INVALIDATE_DOWNSTREAM"; fromStep: StepNumber };
 

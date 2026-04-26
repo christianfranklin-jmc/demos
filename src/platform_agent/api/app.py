@@ -27,7 +27,11 @@ logger = logging.getLogger(__name__)
 
 
 def _cors_origins() -> list[str]:
-    raw = os.environ.get("CORS_ALLOWED_ORIGINS", "http://localhost:5173")
+    # Cover both 127.0.0.1 and localhost on Vite's default port — they are
+    # distinct origins to the browser and prior preflights silently failed
+    # when the user opened the app via the address Vite didn't print.
+    default = "http://localhost:5173,http://127.0.0.1:5173"
+    raw = os.environ.get("CORS_ALLOWED_ORIGINS", default)
     return [origin.strip() for origin in raw.split(",") if origin.strip()]
 
 

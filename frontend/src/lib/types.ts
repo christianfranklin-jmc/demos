@@ -566,7 +566,9 @@ export interface BusinessProcess {
   grain: string | null;
 }
 
-export interface SourceContext {
+// Renamed from `SourceContext` to avoid collision with the demo-tool
+// SourceContext (highspot/atlan/snowflake/allocadia mock cards).
+export interface DiscoveredSource {
   productName: string;
   domainSummary: string;
   businessProcesses: BusinessProcess[];

@@ -38,7 +38,23 @@ import type {
 
 // ─── PRD ───
 
-export function prdFromBackend(payload: BackendPrd): Partial<PRDArtifact> {
+export interface PrdAdapterOptions {
+  /** Driver type from AppContext.connection (e.g. "postgresql", "snowflake"). */
+  driverType?: string | null;
+  /** Default data domain for source systems — overrides "Sales & Operations" hardcode. */
+  dataDomain?: string | null;
+}
+
+const DRIVER_LABELS: Record<string, string> = {
+  postgresql: "RDS PostgreSQL",
+  redshift: "Amazon Redshift",
+  snowflake: "Snowflake",
+};
+
+export function prdFromBackend(
+  payload: BackendPrd,
+  options: PrdAdapterOptions = {},
+): Partial<PRDArtifact> {
   const find = (heading: string) =>
     payload.sections.find((s) => s.heading.toLowerCase().includes(heading.toLowerCase()))?.body ??
     null;
@@ -59,10 +75,14 @@ export function prdFromBackend(payload: BackendPrd): Partial<PRDArtifact> {
   const sourceSchemas = Array.from(
     new Set(cited.map((t) => t.split(".")[0]).filter(Boolean)),
   );
+  const driverLabel = options.driverType
+    ? DRIVER_LABELS[options.driverType] ?? options.driverType
+    : "Source";
+  const dataDomain = options.dataDomain || "General Analytics";
   const sourceSystems: SourceSystem[] | null = sourceSchemas.length
     ? sourceSchemas.map((s) => ({
-        system: `RDS PostgreSQL · ${s}`,
-        data_domain: "Sales & Operations",
+        system: `${driverLabel} · ${s}`,
+        data_domain: dataDomain,
         access_confirmed: true,
       }))
     : null;

@@ -10,7 +10,7 @@ import { useEffect, useRef } from "react";
 import { useAppState } from "../context/AppContext";
 import { getOrMintSessionId } from "../lib/session";
 import { getIdToken, isAuthEnabled } from "../lib/auth";
-import type { SourceContext } from "../lib/types";
+import type { DiscoveredSource } from "../lib/types";
 
 const BACKEND_URL =
   (import.meta as any).env?.VITE_BACKEND_URL ?? "http://localhost:8080";
@@ -18,7 +18,7 @@ const BACKEND_URL =
 interface DiscoverResponseRaw {
   product_name: string;
   domain_summary: string;
-  business_processes: SourceContext["businessProcesses"];
+  business_processes: DiscoveredSource["businessProcesses"];
   suggested_questions: string[];
   step_suggestions: Record<"1" | "2" | "3" | "4", string[]>;
 }
@@ -63,7 +63,7 @@ export function useSourceDiscovery(): void {
           return;
         }
         const raw = (await r.json()) as DiscoverResponseRaw;
-        const context: SourceContext = {
+        const context: DiscoveredSource = {
           productName: raw.product_name,
           domainSummary: raw.domain_summary,
           businessProcesses: raw.business_processes ?? [],
