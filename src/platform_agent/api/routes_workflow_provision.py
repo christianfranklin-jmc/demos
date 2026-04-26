@@ -71,7 +71,39 @@ async def post_provision(
                 detail={"code": "read_only_violation", "message": str(exc)},
             ) from exc
 
-    if not payload.redundancy_cleared:
+    # Phase 8 hardens the gate: when a `redundancy_report_id` is supplied
+    # we look it up; the soft `redundancy_cleared` flag remains the v1
+    # default for callers (e.g., the auto-flow from a fresh pill click)
+    # that haven't run the gate yet — those will be unable to opt out
+    # once the gate is mandatory in a follow-up.
+    if payload.redundancy_report_id:
+        from platform_agent.api.routes_redundancy import get_report
+
+        report = get_report(payload.redundancy_report_id)
+        if report is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "code": "redundancy_report_unknown",
+                    "message": (
+                        f"redundancy_report_id={payload.redundancy_report_id} "
+                        "not found"
+                    ),
+                },
+            )
+        if not report.cleared_to_provision:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "code": "redundancy_not_cleared",
+                    "message": (
+                        "Redundancy report has not cleared this PRD; record "
+                        "decisions via /workflow/redundancy-check/{id}/decide "
+                        "first."
+                    ),
+                },
+            )
+    elif not payload.redundancy_cleared:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
