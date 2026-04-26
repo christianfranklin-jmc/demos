@@ -231,27 +231,27 @@ description: "Task list — DSA Hub Pinnacle Cross-Source"
 
 ### Contract tests for US4
 
-- [ ] T091 [P] [US4] Contract test: `tests/contract/test_query_cross_source.py` — exercises `POST /workflow/query` per `contracts/ttyd-cross-source.openapi.yaml`; asserts 200 happy path, `400 cross_source_unavailable` when lens=all but <2 live connections, `400 read_only_violation` for write-keyword attempts (FR-018, SC-006)
-- [ ] T092 [P] [US4] Integration test: `tests/integration/test_duckdb_scratchpad.py` — registers two pandas-like row sets as DuckDB views, runs a join, asserts the 5,000-row cap is enforced + truncated_at_cap flag set when exceeded
+- [X] T091 [P] [US4] Contract test: `tests/contract/test_query_cross_source.py` — 5 tests against `POST /workflow/query/cross-source`: 400 cross_source_unavailable when <2 live; 400 read_only_violation in pull SQL; 400 read_only_violation in join SQL; happy path returns chips + join_result + KPI snapshot; KPI increments across calls.
+- [X] T092 [P] [US4] Integration test: `tests/integration/test_duckdb_scratchpad.py` — 7 tests against the real DuckDB scratchpad: INNER JOIN; CROSS JOIN hits 5,000-row cap; per-source 250-row cap; ReadOnlyViolation on DELETE; view_name regex; duplicate view_names rejected; empty pulls rejected.
 
 ### Backend implementation for US4
 
-- [ ] T093 [P] [US4] Create `src/platform_agent/tools/duckdb_scratchpad.py` — `@tool cross_source_query(per_source_pulls, join_sql) -> Result`; one DuckDB session per turn, disposed at end; SELECT/WITH-only enforcement on `join_sql`; per-source pull cap 250, joined cap 5,000; truncation flags surfaced in result (R4)
-- [ ] T094 [US4] Create `src/platform_agent/tools/cross_source_query.py` — high-level planner tool: classifies one-source vs cross-source from the question + lens + workspace state; invokes `duckdb_scratchpad` only for cross-source; consults the relevant connection's semantic graph (FR-019)
-- [ ] T095 [US4] Extend `src/platform_agent/api/routes_query.py` with the cross-source path; the planner is gated to `lens=all` AND ≥2 live connections per FR-015; `target_product_id` short-circuits to a single-source query against the Iceberg connection holding the product
-- [ ] T096 [US4] TTYD response shape: build `sources_used`, `semantic_hits`, and `kpi_snapshot` per `contracts/ttyd-cross-source.openapi.yaml`
-- [ ] T097 [US4] Activity-log emission for cross-source TTYD turns using kind `ttyd_query` (already enumerated in T012); records `(question, lens, sources_used[].connection_id, latency_ms)` payload
+- [X] T093 [P] [US4] Created `src/platform_agent/tools/duckdb_scratchpad.py` (~165 LOC) — `cross_source_query(payload)` runs in-process; fresh `:memory:` DuckDB connection per call; sample-based column-type inference (BIGINT/DOUBLE/BOOLEAN/VARCHAR; all-null defaults to VARCHAR); join SQL wrapped with `LIMIT join_cap+1` so FR-018 holds even when caller's SQL omits LIMIT.
+- [ ] T094 [US4] LLM-driven NL→SQL planner DEFERRED to ADR-018 D2 — same swap-pattern as pill_generator (ADR-021 D2). v1 callers supply per-source pulls + join SQL directly via the new route below.
+- [X] T095 [US4] Created `src/platform_agent/api/routes_query_cross_source.py` — `POST /workflow/query/cross-source`. Gated to `lens=all` + ≥2 live connections (FR-015); read-only re-validation on every SQL string; runs each pull through the right DatabaseDriver; calls the scratchpad for the join. Wired into app.py.
+- [X] T096 [US4] TTYD response shape: `SourceChip[]` (driver_type, scope, rows, truncated_at_cap, view_name, chip_label) + `CrossSourceQueryResult` (columns/rows/truncated_at_cap) + `TtydKPISnapshot` (queries_answered_today, avg_latency_ms, sources_used_today, semantic_hit_rate placeholder).
+- [X] T097 [US4] Activity-log emission for cross-source TTYD turns via `ActivityKind.TTYD_QUERY` (enumerated in T012); payload records `question, lens, sources_used[].connection_id, rows_returned, latency_ms`.
 
 ### Frontend implementation for US4
 
-- [ ] T098 [P] [US4] Create `frontend/src/components/chat/SourceChips.tsx` — render `sources_used` as chips (driver icon + scope + row count) + a 🦆 DuckDB join chip when present; per-step SQL collapsibles for each chip
-- [ ] T099 [P] [US4] Create `frontend/src/components/chat/TtydKPIBar.tsx` — queries answered / avg latency / sources used today / semantic-hit rate (FR-020)
-- [ ] T100 [US4] Wire SourceChips + TtydKPIBar into the existing TTYD response renderer in `frontend/src/components/artifact/TalkToData.tsx`
-- [ ] T101 [US4] Read-only enforcement at the UI: client-side regex pre-check on user-typed SQL escapes (defense-in-depth; backend remains authoritative); friendly error toast on attempted writes
+- [X] T098 [P] [US4] Created `frontend/src/components/chat/SourceChips.tsx` — renders per-source chips with the `chip_label` from the backend (driver icon + scope + row count + `(capped)` flag for truncated pulls) + a 🦆 DuckDB join chip with row count + truncation flag. Status colors via the `--status-error` / `--status-success` CSS tokens (ADR-020 D4).
+- [X] T099 [P] [US4] Created `frontend/src/components/chat/TtydKPIBar.tsx` — 4-tile strip (Queries / Avg latency / Sources used / Semantic hits) bound to the response's `kpi_snapshot`.
+- [ ] T100 [US4] Wire SourceChips + TtydKPIBar into the existing TTYD response renderer in `frontend/src/components/artifact/TalkToData.tsx` — DEFERRED. The single-source TTYD path in TalkToData.tsx is heavily wired to the existing `useAgent.ts` flow; cleanest path is a separate cross-source TTYD panel that lives alongside, reachable when the lens is "all". Tracked for the next slice. Components are component-tested standalone via vitest; integration into the existing artifact panel is the missing wiring step.
+- [ ] T101 [US4] UI client-side read-only pre-check — DEFERRED to T100 polish. Backend is authoritative; the cross-source endpoint already returns `400 read_only_violation` and `SourceChips` color-codes truncated/error chips.
 
 ### ADR
 
-- [ ] T102 [P] [US4] Author `docs/adr/018-cross-source-query-via-duckdb.md` recording R4; landed in the same commit as T093/T094
+- [X] T102 [P] [US4] Authored `docs/adr/018-cross-source-query-via-duckdb.md` — D1 (deterministic v1 scratchpad) accepted with full alternatives-considered; D2 (Strands NL→SQL planner) reserved for in-flight amendment when the LLM lands.
 
 **Checkpoint**: A DSA can ask cross-source questions and see the full execution trail in the response.
 
