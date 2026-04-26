@@ -37,44 +37,44 @@ description: "Task list — DSA Hub Pinnacle Cross-Source"
 
 ### Pydantic models — ALL entities from data-model.md
 
-- [ ] T007 [P] Create `src/platform_agent/workspace/models.py` with Pydantic v2 models: `Workspace`, `Connection`, `ConnectionKPIs`, `ConnectionError`, `Lens` (data-model.md §1, §2)
-- [ ] T008 [P] Create `src/platform_agent/semantic/models.py` with Pydantic v2 models: `SemanticEntity`, `Attribute`, `PhysicalBinding`, `Metric`, `Join` (data-model.md §4, §5, §6, §7)
-- [ ] T009 [P] Create `src/platform_agent/workflow/discovery_models.py` with `BusinessProcess`, `VolumeSignal`, `CoverageMatrix`, `CoverageRow`, `ProcessPresence` (data-model.md §8, §9)
-- [ ] T010 [P] Create `src/platform_agent/workflow/pill_models.py` with `PillSuggestion`, `PRDDraft`, `ProposedEntity`, `ProposedMetric`, `ProposedJoin`, `SourcePullSpec`, `IcebergTarget` (data-model.md §10, §11)
-- [ ] T011 [P] Create `src/platform_agent/provisioning/models.py` with `ProvisioningRun`, `AgentExecution`, `AgentError`, `Artifact`, `KpiTick`, `RedundancyReport`, `OverlapItem`, `Decision`, `IcebergDataProduct`, `ValidationResult` (data-model.md §12, §13, §14, §15)
-- [ ] T012 [P] Create `src/platform_agent/workspace/activity_models.py` with `ActivityLogEntry` and the kind enum (data-model.md §16). Enumerate all 13 kinds upfront so per-feature tasks don't need conditional enum edits: `connection_added`, `connection_error`, `connection_retried`, `discovery_completed`, `pill_clicked`, `prd_drafted`, `redundancy_decision`, `provisioning_started`, `agent_state_change`, `validation_result`, `product_registered`, `product_promoted`, `ttyd_query`.
+- [X] T007 [P] Create `src/platform_agent/workspace/models.py` with Pydantic v2 models: `Workspace`, `Connection`, `ConnectionKPIs`, `ConnectionError`, `Lens` (data-model.md §1, §2)
+- [X] T008 [P] Create `src/platform_agent/semantic/models.py` with Pydantic v2 models: `SemanticEntity`, `Attribute`, `PhysicalBinding`, `Metric`, `Join` (data-model.md §4, §5, §6, §7)
+- [X] T009 [P] Create `src/platform_agent/workflow/discovery_models.py` with `BusinessProcess`, `VolumeSignal`, `CoverageMatrix`, `CoverageRow`, `ProcessPresence` (data-model.md §8, §9)
+- [X] T010 [P] Create `src/platform_agent/workflow/pill_models.py` with `PillSuggestion`, `PRDDraft`, `ProposedEntity`, `ProposedMetric`, `ProposedJoin`, `SourcePullSpec`, `IcebergTarget` (data-model.md §10, §11)
+- [X] T011 [P] Create `src/platform_agent/provisioning/models.py` with `ProvisioningRun`, `AgentExecution`, `AgentError`, `Artifact`, `KpiTick`, `RedundancyReport`, `OverlapItem`, `Decision`, `IcebergDataProduct`, `ValidationResult` (data-model.md §12, §13, §14, §15)
+- [X] T012 [P] Create `src/platform_agent/workspace/activity_models.py` with `ActivityLogEntry` and the kind enum (data-model.md §16). Enumerate all 13 kinds upfront so per-feature tasks don't need conditional enum edits: `connection_added`, `connection_error`, `connection_retried`, `discovery_completed`, `pill_clicked`, `prd_drafted`, `redundancy_decision`, `provisioning_started`, `agent_state_change`, `validation_result`, `product_registered`, `product_promoted`, `ttyd_query`.
 
 ### Per-tab session header alias (FR-006)
 
-- [ ] T013 Update `src/platform_agent/api/deps.py` to accept `X-DSA-Workspace-ID` as a synonym for `X-DSA-Session-ID` for one minor version; add a deprecation log on the alias path; preserve existing single-source SessionContext behavior
+- [X] T013 Update `src/platform_agent/api/deps.py` to accept `X-DSA-Workspace-ID` as a synonym for `X-DSA-Session-ID` for one minor version; add a deprecation log on the alias path; preserve existing single-source SessionContext behavior
 
 ### Workspace registry (per-tab in-memory)
 
-- [ ] T014 Create `src/platform_agent/workspace/registry.py` — `WorkspaceRegistry` keyed by per-tab UUID, holding `Workspace` records with their `connections[]`; thread-safe; in-memory only (Q1, R1)
-- [ ] T015 Create `src/platform_agent/workspace/multi_source_driver.py` — `MultiSourceDriver` that holds a registry of `DatabaseDriver` instances per `connection_id` and routes `scan_metadata` / `run_query` based on a fully-qualified `source.schema.table` reference (plan.md project structure)
+- [X] T014 Create `src/platform_agent/workspace/registry.py` — `WorkspaceRegistry` keyed by per-tab UUID, holding `Workspace` records with their `connections[]`; thread-safe; in-memory only (Q1, R1)
+- [X] T015 Create `src/platform_agent/workspace/multi_source_driver.py` — `MultiSourceDriver` that holds a registry of `DatabaseDriver` instances per `connection_id` and routes `scan_metadata` / `run_query` based on a fully-qualified `source.schema.table` reference (plan.md project structure)
 
 ### Driver: Iceberg/Glue (new — required by US1 and downstream)
 
-- [ ] T016 [P] Create `src/platform_agent/drivers/iceberg.py` — `IcebergDriver` implementing the existing `DatabaseDriver` protocol via `pyiceberg` + `boto3` Glue client; supports `connect`, `scan_metadata` (Glue `GetTables` + `Catalog.load_table`), `run_query` (pyiceberg `Table.scan()` with 250-row cap at scan layer), `dbt_config` (dbt-glue profile) (R3)
-- [ ] T017 [P] Register `IcebergDriver` in `src/platform_agent/drivers/__init__.py` `DRIVER_REGISTRY` so `create_driver(driver_type="iceberg", ...)` resolves
-- [ ] T018 [P] Contract test: `tests/contract/test_iceberg_driver.py` — covers connect/scan/query/dbt_config against either a moto-glue stub or a recorded fixture; verifies SELECT/WITH-only enforcement and the 250-row cap
+- [X] T016 [P] Create `src/platform_agent/drivers/iceberg.py` — `IcebergDriver` implementing the existing `DatabaseDriver` protocol via `pyiceberg` + `boto3` Glue client; supports `connect`, `scan_metadata` (Glue `GetTables` + `Catalog.load_table`), `run_query` (pyiceberg `Table.scan()` with 250-row cap at scan layer), `dbt_config` (dbt-glue profile) (R3)
+- [X] T017 [P] Register `IcebergDriver` in `src/platform_agent/drivers/__init__.py` `DRIVER_REGISTRY` so `create_driver(driver_type="iceberg", ...)` resolves
+- [X] T018 [P] Contract test: `tests/contract/test_iceberg_driver.py` — covers connect/scan/query/dbt_config against either a moto-glue stub or a recorded fixture; verifies SELECT/WITH-only enforcement and the 250-row cap
 
 ### Per-connection durable store (Q2, R2)
 
-- [ ] T019 Create `src/platform_agent/semantic/store.py` — `ConnectionStore` Protocol + `make_store(connection_id)` factory selecting local vs deployed via `STORAGE_BACKEND` env
-- [ ] T020 Create `src/platform_agent/semantic/store_local.py` — SQLite-backed store at `~/.dsa-hub/connections/<connection_id>/store.db` with tables `entities`, `attributes`, `metrics`, `joins`, `physical_bindings`, `products`, `activity_log`, `discovery_cache`; transactions per write (R2)
-- [ ] T021 Create `src/platform_agent/semantic/migrations/__init__.py` + `001_initial.py` — alembic-style schema migration framework for the SQLite store; runs on first open
-- [ ] T022 [P] Create `src/platform_agent/semantic/store_deployed.py` — DynamoDB single-table `DSAHubConnectionStore` (PK `connection_id`, SK `entity_kind#entity_id`) with sparse GSI on `(connection_id, kind)`; idempotent put/get/list; honors the same Protocol (R2)
-- [ ] T023 [P] Add Terraform definition for the DynamoDB table in `infra-terraform/modules/data/main.tf` (deployed-mode only; local mode skips); plus IAM policy fragment for runtime access
-- [ ] T024 [P] Contract test: `tests/contract/test_connection_store.py` — exercises both backends behind the Protocol; covers entity CRUD, joins, products, activity log append-only invariant (data-model.md §3 invariants)
+- [X] T019 Create `src/platform_agent/semantic/store.py` — `ConnectionStore` Protocol + `make_store(connection_id)` factory selecting local vs deployed via `STORAGE_BACKEND` env
+- [X] T020 Create `src/platform_agent/semantic/store_local.py` — SQLite-backed store at `~/.dsa-hub/connections/<connection_id>/store.db` with tables `entities`, `attributes`, `metrics`, `joins`, `physical_bindings`, `products`, `activity_log`, `discovery_cache`; transactions per write (R2)
+- [X] T021 Create `src/platform_agent/semantic/migrations/__init__.py` + `001_initial.py` — alembic-style schema migration framework for the SQLite store; runs on first open
+- [X] T022 [P] Create `src/platform_agent/semantic/store_deployed.py` — DynamoDB single-table `DSAHubConnectionStore` (PK `connection_id`, SK `entity_kind#entity_id`) with sparse GSI on `(connection_id, kind)`; idempotent put/get/list; honors the same Protocol (R2)
+- [ ] T023 [P] Add Terraform definition for the DynamoDB table in `infra-terraform/modules/data/main.tf` (deployed-mode only; local mode skips); plus IAM policy fragment for runtime access — DEFERRED (deployed-mode-only; local Phase-2 scope sufficient for MVP+US1; track for US3 deployment)
+- [X] T024 [P] Contract test: `tests/contract/test_connection_store.py` — exercises both backends behind the Protocol; covers entity CRUD, joins, products, activity log append-only invariant (data-model.md §3 invariants)
 
 ### `connection_id` derivation
 
-- [ ] T025 Add `src/platform_agent/workspace/connection_id.py` — `derive_connection_id(driver_type, endpoint, scope) -> str` returning a stable SHA-256 (R2); unit-tested with property tests for stability across argument-order normalization
+- [X] T025 Add `src/platform_agent/workspace/connection_id.py` — `derive_connection_id(driver_type, endpoint, scope) -> str` returning a stable SHA-256 (R2); unit-tested with property tests for stability across argument-order normalization
 
 ### Activity log writer
 
-- [ ] T026 Create `src/platform_agent/workspace/activity_log.py` — append-only writer that takes `(connection_id, kind, payload)` and writes through the connection's store; never raises into the caller (logs+drops on store failure to preserve user-flow invariants)
+- [X] T026 Create `src/platform_agent/workspace/activity_log.py` — append-only writer that takes `(connection_id, kind, payload)` and writes through the connection's store; never raises into the caller (logs+drops on store failure to preserve user-flow invariants)
 
 ### Bootstrap script + Pinnacle seeds (FR-042, R11)
 
@@ -84,9 +84,9 @@ description: "Task list — DSA Hub Pinnacle Cross-Source"
 
 ### ADRs (in-flight per Addendum E)
 
-- [ ] T030 [P] Author `docs/adr/016-multi-connection-workspace.md` recording Q1 (per-tab/session) decision; landed in the same commit as T013/T014
-- [ ] T031 [P] Author `docs/adr/017-per-connection-semantic-graph.md` recording Q2 + R2 (per-connection store, SQLite local / DynamoDB deployed); landed in the same commit as T019/T020
-- [ ] T031a [P] Author **initial** `docs/adr/020-provisioning-orchestration-iceberg.md` (Iceberg driver decision only — R3); landed in the same commit as T016. The orchestration + validation-threshold + palette portions of the decision (R6 + R8 + R10) are added as an amendment in Phase 5 (T090). This split keeps Addendum E's "ADR lands with the decision" invariant intact, since the IcebergDriver decision physically commits in Phase 2.
+- [X] T030 [P] Author `docs/adr/016-multi-connection-workspace.md` recording Q1 (per-tab/session) decision; landed in the same commit as T013/T014
+- [X] T031 [P] Author `docs/adr/017-per-connection-semantic-graph.md` recording Q2 + R2 (per-connection store, SQLite local / DynamoDB deployed); landed in the same commit as T019/T020
+- [X] T031a [P] Author **initial** `docs/adr/020-provisioning-orchestration-iceberg.md` (Iceberg driver decision only — R3); landed in the same commit as T016. The orchestration + validation-threshold + palette portions of the decision (R6 + R8 + R10) are added as an amendment in Phase 5 (T090). This split keeps Addendum E's "ADR lands with the decision" invariant intact, since the IcebergDriver decision physically commits in Phase 2.
 
 **Checkpoint**: Foundation ready — every user story phase below can now begin in parallel (subject to team capacity).
 

@@ -30,6 +30,12 @@ try:
 except ImportError:
     pass
 
+try:
+    from .iceberg import IcebergDriver
+    DRIVER_REGISTRY["iceberg"] = IcebergDriver
+except ImportError:
+    pass
+
 # Active driver instances keyed by source_id
 _drivers: dict[str, DatabaseDriver] = {}
 
