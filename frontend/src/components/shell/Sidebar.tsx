@@ -5,8 +5,60 @@ import { DATA_PRODUCTS, type DataProduct } from "../../data/mock/data-products";
 import type { StepNumber, StepStatus } from "../../lib/types";
 import ConnectionForm from "./ConnectionForm";
 
+type ShellView = "workflow" | "connections";
+
 interface SidebarProps {
   onSettingsOpen: () => void;
+  view?: ShellView;
+  onViewChange?: (view: ShellView) => void;
+}
+
+interface SidebarNavItemProps {
+  icon: string;
+  label: string;
+  badge?: string;
+  isActive: boolean;
+  onClick: () => void;
+  theme: any;
+}
+
+function SidebarNavItem({
+  icon,
+  label,
+  badge,
+  isActive,
+  onClick,
+  theme,
+}: SidebarNavItemProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex items-center gap-2 px-2 py-1.5 text-sm w-full text-left"
+      style={{
+        backgroundColor: isActive ? theme.colors.surfaceActiveNav : "transparent",
+        borderRadius: `${theme.layout.borderRadius.nav}px`,
+        color: theme.colors.textPrimary,
+        fontWeight: isActive
+          ? theme.typography.mediumWeight
+          : theme.typography.bodyWeight,
+      }}
+    >
+      <span aria-hidden>{icon}</span>
+      <span className="flex-1 truncate">{label}</span>
+      {badge ? (
+        <span
+          className="text-[10px] px-1.5 py-0.5 rounded-full"
+          style={{
+            backgroundColor: theme.colors.accent,
+            color: theme.colors.btnPrimaryText ?? theme.colors.white,
+          }}
+        >
+          {badge}
+        </span>
+      ) : null}
+    </button>
+  );
 }
 
 function StepIndicator({ status, isActive, theme }: { status: StepStatus; isActive: boolean; theme: any }) {
@@ -77,10 +129,17 @@ function ProductStatusDot({ product, theme }: { product: DataProduct; theme: any
   );
 }
 
-export default function Sidebar({ onSettingsOpen }: SidebarProps) {
+export default function Sidebar({
+  onSettingsOpen,
+  view = "workflow",
+  onViewChange,
+}: SidebarProps) {
   const { state, dispatch } = useAppState();
   const { theme } = useTheme();
   const [selectedProductId, setSelectedProductId] = useState(state.lifecycle.data_product_id);
+  const liveConnections = state.workspaceConnections.filter(
+    (c) => c.status === "live"
+  ).length;
 
   const stepLabels: Record<number, string> = {
     0: theme.steps.step0Label,
@@ -125,6 +184,27 @@ export default function Sidebar({ onSettingsOpen }: SidebarProps) {
           {theme.brand.platformName}
         </span>
       </div>
+
+      {/* 002-dsa-hub-pinnacle US1 — top-level view toggle */}
+      {onViewChange ? (
+        <div className="px-3 pb-2 flex flex-col gap-0.5">
+          <SidebarNavItem
+            icon="📐"
+            label="Workflow"
+            isActive={view === "workflow"}
+            onClick={() => onViewChange("workflow")}
+            theme={theme}
+          />
+          <SidebarNavItem
+            icon="🌐"
+            label="Connections"
+            badge={liveConnections > 0 ? String(liveConnections) : undefined}
+            isActive={view === "connections"}
+            onClick={() => onViewChange("connections")}
+            theme={theme}
+          />
+        </div>
+      ) : null}
 
       {/* Extra nav items */}
       {theme.sidebar.navItems.map((item: any, i: number) => (
