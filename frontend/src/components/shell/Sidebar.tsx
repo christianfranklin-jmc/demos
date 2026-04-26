@@ -5,7 +5,7 @@ import { DATA_PRODUCTS, type DataProduct } from "../../data/mock/data-products";
 import type { StepNumber, StepStatus } from "../../lib/types";
 import ConnectionForm from "./ConnectionForm";
 
-type ShellView = "workflow" | "connections";
+type ShellView = "workflow" | "connections" | "discovery";
 
 interface SidebarProps {
   onSettingsOpen: () => void;
@@ -185,7 +185,7 @@ export default function Sidebar({
         </span>
       </div>
 
-      {/* 002-dsa-hub-pinnacle US1 — top-level view toggle */}
+      {/* 002-dsa-hub-pinnacle US1+US2 — top-level view toggle */}
       {onViewChange ? (
         <div className="px-3 pb-2 flex flex-col gap-0.5">
           <SidebarNavItem
@@ -201,6 +201,13 @@ export default function Sidebar({
             badge={liveConnections > 0 ? String(liveConnections) : undefined}
             isActive={view === "connections"}
             onClick={() => onViewChange("connections")}
+            theme={theme}
+          />
+          <SidebarNavItem
+            icon="🧭"
+            label="Discovery"
+            isActive={view === "discovery"}
+            onClick={() => onViewChange("discovery")}
             theme={theme}
           />
         </div>

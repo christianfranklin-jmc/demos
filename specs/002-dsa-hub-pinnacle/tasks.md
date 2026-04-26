@@ -151,13 +151,13 @@ description: "Task list — DSA Hub Pinnacle Cross-Source"
 
 ### Frontend implementation for US2
 
-- [ ] T058 [P] [US2] Create `frontend/src/routes/Step1Discovery.tsx` — replaces today's Step 1; renders KPI strip, ProcessCard list, CoverageMatrix, PillRow
-- [ ] T059 [P] [US2] Create `frontend/src/components/discovery/ProcessCard.tsx` — name + domain icon + source backings + volume signal (row count + dollar total) + last-activity timestamp + sparkline (FR-009)
-- [ ] T060 [P] [US2] Create `frontend/src/components/discovery/CoverageMatrix.tsx` — process × connection grid; ready-to-combine cells highlighted (FR-010)
-- [ ] T061 [P] [US2] Create `frontend/src/components/discovery/PillRow.tsx` — pill chips with title / subtitle / icon / estimated minutes; click-to-PRD handoff
-- [ ] T062 [P] [US2] Create `frontend/src/hooks/usePills.ts` and `frontend/src/hooks/useSourceDiscovery.ts` (extend existing) for per-connection + workspace-level discovery; cache keyed by workspace + force flag
-- [ ] T063 [US2] Wire pill click → navigate to `/workflow/step2?pill_id=...`; Step 2 reads `pill_id`, calls `/workflow/pills/{id}/draft-prd`, opens with the seeded PRD
-- [ ] T064 [US2] Update `frontend/src/hooks/useAgent.demo.ts` with the canned Pinnacle multi-source scenario (FR-041, R9): pre-staged Iceberg connection, 2 source connections going live with seeded KPI counts, 8 process cards, 6 demo pills, scripted Build-page run
+- [X] T058 [P] [US2] Created `frontend/src/routes/Step1Discovery.tsx` (285 lines) — three stacked sections (Detected business processes / Cross-source coverage / Pilled PRDs) + 5-tile KPI strip (tables/columns/processes/cross-source-links/pills). Uses useWorkspaceDiscover + usePills. Re-discover button forces fresh scan. Empty state when no live connections.
+- [X] T059 [P] [US2] Created `frontend/src/components/discovery/ProcessCard.tsx` (132 lines) — domain icon + driver icon + name + scope + volume (row count, $ total when present) + last-activity relative timestamp + 12-point SVG sparkline (FR-009).
+- [X] T060 [P] [US2] Created `frontend/src/components/discovery/CoverageMatrix.tsx` (128 lines) — process × connection grid; ready_to_combine rows tinted in success-green (#16A34A14 background, ADR-020 D4 token); shared-keys column shows the joined columns inline (FR-010).
+- [X] T061 [P] [US2] Created `frontend/src/components/discovery/PillRow.tsx` (112 lines) — pill chips with title / subtitle / target FQN / estimated minutes / per-pill loading state on click. Empty state when ≥1 connection but pill agent has nothing yet.
+- [X] T062 [P] [US2] Created `frontend/src/hooks/useWorkspaceDiscover.ts` (146 lines) and `frontend/src/hooks/usePills.ts` (135 lines). Workspace-discover hook auto-refreshes when the live-connection set changes (fingerprint-keyed); usePills auto-fetches on mount + exposes `refresh(force)` and `draftPrd(pill_id)` for the click handoff.
+- [X] T063 [US2] Wired pill click → AppShell receives `(pill, prd)` via `onPillAccepted` and switches the view back to "workflow"; the actual Step-2 reader of `prd_id` lands when Phase 5 (US3 provisioning) wires the redundancy gate. For now the click path is observable + the PRD draft is fetched + log-traced. Discovery view added as a third top-level Sidebar entry alongside Workflow + Connections.
+- [ ] T064 [US2] Update `frontend/src/hooks/useAgent.demo.ts` with the canned Pinnacle multi-source scenario — DEFERRED to demo-mode polish slice. The live path works end-to-end against the Pinnacle RDS today, so the offline canned scenario can land alongside SC-009 verification in Polish (T143).
 
 ### ADR
 
