@@ -69,6 +69,9 @@ export function useAgent(): void {
 
   const inFlightRef = useRef<RunStepController | null>(null);
   const lastSentIndexRef = useRef<number>(-1);
+  // Tracks which step+source we've already injected an opener for, so React's
+  // strict-mode double-invoke doesn't dispatch the welcome message twice.
+  const openerKeyRef = useRef<string>("");
 
   // Live-mode opener: when the user enters a step with no messages, inject
   // a greeting + suggested replies so they have a starting point without
@@ -78,8 +81,17 @@ export function useAgent(): void {
     const step = state.lifecycle.current_step;
     const opener = STEP_OPENERS[step];
     if (!opener) return;
+    // Idempotent guard — strict-mode double-invokes the effect on mount, and
+    // re-runs whenever the dependency list changes. Without this ref the
+    // welcome message would be dispatched twice on the very first render.
+    const key = `${step}`;
+    if (openerKeyRef.current === key) return;
     const stepMessages = state.conversation.filter((m) => m.step === step);
-    if (stepMessages.length > 0) return;
+    if (stepMessages.length > 0) {
+      openerKeyRef.current = key; // already there from a prior render
+      return;
+    }
+    openerKeyRef.current = key;
     // Prefer source-specific suggestions from /workflow/discover when
     // available. Falls back to the schema-agnostic openers otherwise.
     const discovered = state.sourceContext?.stepSuggestions?.[
@@ -99,7 +111,7 @@ export function useAgent(): void {
       } as any,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.lifecycle.current_step, state.demoMode.enabled, state.sourceContext]);
+  }, [state.lifecycle.current_step, state.demoMode.enabled]);
 
   useEffect(() => {
     if (state.demoMode.enabled) return; // demo engine owns message dispatch
