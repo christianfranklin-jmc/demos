@@ -441,7 +441,7 @@ Append-only audit row. Lives in **each connection's** store (the connection that
 | `entry_id` | `str` | UUID. |
 | `connection_id` | `str` | Owner. |
 | `workspace_id` | `UUID` | The tab that produced the action (kept for audit, not for joins). |
-| `kind` | `enum` | `connection_added`, `discovery_completed`, `pill_clicked`, `prd_drafted`, `redundancy_decision`, `provisioning_started`, `agent_state_change`, `validation_result`, `product_registered`, `product_promoted`. |
+| `kind` | `enum` | `connection_added`, `connection_error`, `connection_retried`, `discovery_completed`, `pill_clicked`, `prd_drafted`, `redundancy_decision`, `provisioning_started`, `agent_state_change`, `validation_result`, `product_registered`, `product_promoted`, `ttyd_query`. |
 | `payload` | `dict` | Kind-specific shape. |
 | `ts` | `datetime` | |
 

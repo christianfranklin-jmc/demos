@@ -226,7 +226,7 @@ eval/test_cases/
   delivery_agent.json                 # NEW
 ```
 
-**Structure Decision**: Web application layout (Option 2 from the template) — backend (`src/platform_agent/`) + frontend (`frontend/`) — with the existing CLI (`src/platform_agent/__main__.py`) and Streamlit (`streamlit_app/`) preserved. New backend modules (`provisioning/`, `semantic/`, `workspace/`) follow the existing one-tool-per-file pattern. Patterns/agents from the migration-suite are **promoted from `patterns/migration-agent/`** into `src/platform_agent/provisioning/agents/` rather than re-implemented; the legacy `patterns/` tree remains as historical reference per the user input "wire it now."
+**Structure Decision**: Web application layout (Option 2 from the template) — backend (`src/platform_agent/`) + frontend (`frontend/`) — with the existing CLI (`src/platform_agent/__main__.py`) and Streamlit (`streamlit_app/`) preserved. New backend modules (`provisioning/`, `semantic/`, `workspace/`) follow the existing one-tool-per-file pattern. Patterns/agents from the migration suite are **promoted from `patterns/migration-agent/` (schema, pipeline, model, mapping) and `patterns/quality-agent/` (quality)** into `src/platform_agent/provisioning/agents/` rather than re-implemented; the legacy `patterns/` tree remains as historical reference per the user input "wire it now."
 
 ## Complexity Tracking
 

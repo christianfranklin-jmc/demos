@@ -42,7 +42,7 @@ description: "Task list — DSA Hub Pinnacle Cross-Source"
 - [ ] T009 [P] Create `src/platform_agent/workflow/discovery_models.py` with `BusinessProcess`, `VolumeSignal`, `CoverageMatrix`, `CoverageRow`, `ProcessPresence` (data-model.md §8, §9)
 - [ ] T010 [P] Create `src/platform_agent/workflow/pill_models.py` with `PillSuggestion`, `PRDDraft`, `ProposedEntity`, `ProposedMetric`, `ProposedJoin`, `SourcePullSpec`, `IcebergTarget` (data-model.md §10, §11)
 - [ ] T011 [P] Create `src/platform_agent/provisioning/models.py` with `ProvisioningRun`, `AgentExecution`, `AgentError`, `Artifact`, `KpiTick`, `RedundancyReport`, `OverlapItem`, `Decision`, `IcebergDataProduct`, `ValidationResult` (data-model.md §12, §13, §14, §15)
-- [ ] T012 [P] Create `src/platform_agent/workspace/activity_models.py` with `ActivityLogEntry` and the kind enum (data-model.md §16)
+- [ ] T012 [P] Create `src/platform_agent/workspace/activity_models.py` with `ActivityLogEntry` and the kind enum (data-model.md §16). Enumerate all 13 kinds upfront so per-feature tasks don't need conditional enum edits: `connection_added`, `connection_error`, `connection_retried`, `discovery_completed`, `pill_clicked`, `prd_drafted`, `redundancy_decision`, `provisioning_started`, `agent_state_change`, `validation_result`, `product_registered`, `product_promoted`, `ttyd_query`.
 
 ### Per-tab session header alias (FR-006)
 
@@ -240,7 +240,7 @@ description: "Task list — DSA Hub Pinnacle Cross-Source"
 - [ ] T094 [US4] Create `src/platform_agent/tools/cross_source_query.py` — high-level planner tool: classifies one-source vs cross-source from the question + lens + workspace state; invokes `duckdb_scratchpad` only for cross-source; consults the relevant connection's semantic graph (FR-019)
 - [ ] T095 [US4] Extend `src/platform_agent/api/routes_query.py` with the cross-source path; the planner is gated to `lens=all` AND ≥2 live connections per FR-015; `target_product_id` short-circuits to a single-source query against the Iceberg connection holding the product
 - [ ] T096 [US4] TTYD response shape: build `sources_used`, `semantic_hits`, and `kpi_snapshot` per `contracts/ttyd-cross-source.openapi.yaml`
-- [ ] T097 [US4] Activity-log emission for cross-source TTYD turns (kind `validation_result` is reserved for provisioning; new kind `ttyd_query` added to the enum if not present — note in T012 if it needs an addition)
+- [ ] T097 [US4] Activity-log emission for cross-source TTYD turns using kind `ttyd_query` (already enumerated in T012); records `(question, lens, sources_used[].connection_id, latency_ms)` payload
 
 ### Frontend implementation for US4
 
@@ -313,7 +313,7 @@ description: "Task list — DSA Hub Pinnacle Cross-Source"
 ### Frontend implementation for US6
 
 - [ ] T121 [P] [US6] Create `frontend/src/components/gates/RedundancyGate.tsx` — modal between Step 1 and Step 2 (Step 4 in the current numbering) showing report state + per-overlap reuse-or-override cards + override-rationale field for `duplicate`
-- [ ] T122 [P] [US6] Create `frontend/src/components/build/ValidationCard.tsx` — rendered on Build page bottom; per-question spinner → ✓/✗ with SQL + result preview on click; "Re-run from failed step" affordance on <threshold runs (FR-034, FR-035)
+- [ ] T122 [P] [US6] Create `frontend/src/components/build/ValidationCard.tsx` — rendered on Build page bottom; per-question spinner → ✓/✗ with SQL + result preview on click; "Re-run from failed step" affordance on <threshold runs (FR-034, FR-035). Includes the FR-036 validation KPI strip at the card header: `questions auto-validated`, `% passing`, `avg query latency (ms)`, `semantic-layer hit rate`, `Iceberg scan bytes` — sourced from the run's `validation_results[]` + `kpi_series[]` (see `provision.openapi.yaml#KpiTick`).
 - [ ] T123 [P] [US6] Create `frontend/src/hooks/useRedundancyCheck.ts` — calls `POST /workflow/redundancy-check`, holds report state, posts decisions
 - [ ] T124 [US6] Wire RedundancyGate before `POST /workflow/provision`; pass cleared `report_id` into the provision payload
 
