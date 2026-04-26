@@ -147,7 +147,9 @@ streamlit_app/app.py              # Streamlit TTYD app (preserved as alternative
 scripts/
   bootstrap.sh                    # Provision RDS + Redshift Serverless + seed data + config files
   teardown.sh                     # Remove Redshift + RDS + AgentCore + terraform destroy
-  seed_northwinds.sql             # Northwinds DDL + 3362 INSERT statements
+  seed_pinnacle.sql               # Pinnacle Financial DDL + ~15k INSERT statements (8 process schemas — feature 002 FR-042)
+  seed_northwinds.sql             # Legacy Northwinds DDL — Redshift-only path; preserved for back-compat regression
+  regenerate_pinnacle_seed.sh     # pg_dump-based regeneration of seed_pinnacle.sql from a live RDS instance
 .env.example                      # Template for env vars (copy to .env)
 ```
 
@@ -233,18 +235,18 @@ The agent supports multiple database backends via the `DatabaseDriver` protocol 
 - **Account**: 637119802057
 - **Profile**: `AdministratorAccess-637119802057`
 - **Region**: us-east-1
-- **RDS**: Provisioned by `scripts/bootstrap.sh` — PostgreSQL 16.6, db.t3.micro, Northwinds dataset
-- **Redshift**: Provisioned by `scripts/bootstrap.sh` — Serverless, 8 base RPU, Northwinds dataset
+- **RDS**: Provisioned by `scripts/bootstrap.sh` — PostgreSQL 16.6, db.t3.micro, **Pinnacle Financial dataset** (8 business-process schemas: ap, billing, crm, gl, hr, performance, planning, portfolio; ~34 tables; replaces the prior Northwinds seed per feature 002 FR-042)
+- **Redshift**: Provisioned by `scripts/bootstrap.sh` — Serverless, 8 base RPU, Northwinds dataset (Redshift kept on Northwinds for back-compat regression — not in the v1 demo path for feature 002)
 - **Bedrock models**: us.anthropic.claude-sonnet-4, us.anthropic.claude-opus-4
 - **Snowflake**: Pinnacle Financial demo — account `lga76011`, database `PINNACLE_FINANCIAL_DEMO_ASINGH`, schema `ANALYTICS`, SSO via `externalbrowser`
 
 ### Bootstrap creates:
 - Security group (`platform-agent-rds-sg`, ports 5432 + 5439 open)
 - DB subnet group (`platform-agent-db-subnets`)
-- RDS instance (`platform-agent-northwinds`) — PostgreSQL 16.6, db.t3.micro
+- RDS instance (`platform-agent-pinnacle`) — PostgreSQL 16.6, db.t3.micro
 - Redshift Serverless namespace (`platform-agent-ns`) + workgroup (`platform-agent-wg`, 8 base RPU)
-- Seeds Northwinds into both PostgreSQL and Redshift (14 tables, 830 orders)
-- Generates `.env` with DB_* (PostgreSQL) and RS_* (Redshift) connection vars
+- Seeds Pinnacle into PostgreSQL (8 process schemas, ~34 tables, ~15k INSERT statements via `scripts/seed_pinnacle.sql`); seeds Northwinds into Redshift only
+- Generates `.env` with DB_* (PostgreSQL → Pinnacle) and RS_* (Redshift → Northwinds) connection vars
 
 ### Terraform creates (infra-terraform/):
 - Cognito User Pool + OAuth2 clients (web + machine)
