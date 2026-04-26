@@ -21,6 +21,7 @@ from .routes_discover import router as discover_router
 from .routes_health import router as health_router
 from .routes_query import router as query_router
 from .routes_workflow import router as workflow_router
+from .routes_workspace import router as workspace_router
 from .zip_stream import ArtifactStore
 
 logger = logging.getLogger(__name__)
@@ -58,14 +59,23 @@ def create_app() -> FastAPI:
         CORSMiddleware,
         allow_origins=_cors_origins(),
         allow_credentials=False,
-        allow_methods=["GET", "POST", "OPTIONS"],
-        allow_headers=["Content-Type", "Accept", "Authorization", "X-DSA-Session-ID"],
+        # DELETE added for /workspace/connection/{id} (002-dsa-hub-pinnacle US1).
+        allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+        allow_headers=[
+            "Content-Type",
+            "Accept",
+            "Authorization",
+            "X-DSA-Session-ID",
+            # 002-dsa-hub-pinnacle FR-006 — back-compat alias for one minor version.
+            "X-DSA-Workspace-ID",
+        ],
     )
 
     app.include_router(health_router)
     app.include_router(workflow_router)
     app.include_router(query_router)
     app.include_router(discover_router)
+    app.include_router(workspace_router)
 
     return app
 

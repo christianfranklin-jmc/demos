@@ -100,16 +100,16 @@ description: "Task list — DSA Hub Pinnacle Cross-Source"
 
 ### Contract tests for US1
 
-- [ ] T032 [P] [US1] Contract test: `tests/contract/test_workspace_connections.py` — exercises `POST /workspace/connection`, `GET /workspace/connections`, `DELETE /workspace/connection/{id}`, `POST /workspace/connection/{id}/retry`, `GET /workspace/kpis` per `contracts/workspace.openapi.yaml`; covers 201/400/409/204/404; verifies state machine transitions (connecting → scanning → live)
-- [ ] T033 [P] [US1] Integration test: `tests/integration/test_workspace_lifecycle.py` — adds 2 mock connections, asserts kpi merge and lens list; asserts duplicate `(driver_type, endpoint, scope)` is a 409
-- [ ] T034 [P] [US1] Cascade-regression test: extend `tests/integration/test_session_alias.py` to verify a request with `X-DSA-Session-ID` only (no workspace header) routes to single-source path identically to pre-feature behavior (SC-007)
+- [X] T032 [P] [US1] Contract test: `tests/contract/test_workspace_connections.py` — 14 tests covering POST/GET/DELETE/retry/KPIs per `contracts/workspace.openapi.yaml`; covers 201/400/409/422/204/404; verifies connecting→scanning→live state-machine transitions (via `DSA_HUB_LIFECYCLE_FAKE=1`).
+- [X] T033 [P] [US1] Integration test: `tests/integration/test_workspace_lifecycle.py` — 3 tests: full 2-connection workspace (PG+SF) reaches live with merged KPIs and `connection_added` log entries; duplicate-tuple → 409; per-tab session UUIDs do not share state (Q1 invariant).
+- [X] T034 [P] [US1] Cascade-regression test: `tests/integration/test_session_alias.py` — 4 tests: `X-DSA-Session-ID` alone unchanged; `X-DSA-Workspace-ID` alone produces same SessionContext; canonical header wins when both supplied; missing both → 400 with both names hinted.
 
 ### Backend implementation for US1
 
-- [ ] T035 [US1] Create `src/platform_agent/api/routes_workspace.py` implementing all endpoints in `contracts/workspace.openapi.yaml`; uses `WorkspaceRegistry` (T014) + `MultiSourceDriver` (T015) + `derive_connection_id` (T025)
-- [ ] T036 [US1] Wire `routes_workspace` into `src/platform_agent/api/app.py` lifespan + router list
-- [ ] T037 [US1] Implement connection lifecycle worker in `src/platform_agent/workspace/lifecycle.py` — async transitions `connecting → scanning → live` (calls driver.connect → scan_metadata) with KPI tile updates; error path with `retryable` classification
-- [ ] T038 [US1] Activity-log emission for `connection_added`, `connection_error`, `connection_retried` (uses T026)
+- [X] T035 [US1] Created `src/platform_agent/api/routes_workspace.py` — 5 endpoints from `contracts/workspace.openapi.yaml`: list/add/delete/retry/kpis. Uses WorkspaceRegistry (T014) + derive_connection_id (T025) + log_activity (T026). Per-tab credential cache `_creds[(session_id, connection_id)]` is process-local and ephemeral; `get_credentials()` exposed to the lifecycle worker.
+- [X] T036 [US1] Wired `routes_workspace` into `src/platform_agent/api/app.py`. CORS allow_methods extended with DELETE; allow_headers includes `X-DSA-Workspace-ID` alias (FR-006).
+- [X] T037 [US1] Created `src/platform_agent/workspace/lifecycle.py` — async lifecycle worker `connecting → scanning → live`. Real path uses `_make_driver()` to instantiate the right DatabaseDriver from credentials and runs `scan_metadata()` in a worker thread; fake path (`DSA_HUB_LIFECYCLE_FAKE=1`) populates canned KPIs (14/15415/8). Error path sets ConnectionStatus.ERROR with retryable=True. `await_inflight()` exposed for test/shutdown synchronization. **Smoke-tested live against the Pinnacle RDS — connection reached `live` end-to-end.**
+- [X] T038 [US1] Activity-log emission wired in `routes_workspace`: `CONNECTION_ADDED` on add, `CONNECTION_RETRIED` on retry; lifecycle worker emits `CONNECTION_ERROR` on failure. All entries land via `platform_agent.workspace.activity_log.write` (T026).
 
 ### Frontend implementation for US1
 
