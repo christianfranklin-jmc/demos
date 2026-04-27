@@ -138,6 +138,160 @@ async def add_connection(
     return connection
 
 
+# ───── Demo presets — local-mode only ─────
+#
+# Reads connection metadata + credentials from os.environ (i.e. .env)
+# server-side and adds the connection in one click. Credentials stay
+# in the per-tab session cache exactly like /workspace/connection;
+# they never appear in the client bundle or HTTP response.
+
+_PRESETS: dict[str, dict[str, Any]] = {
+    "pinnacle_pg": {
+        "driver_type": "postgresql",
+        "display_name": "Pinnacle PG",
+        "scope_template": "{db}.public",
+        # Required env vars for this preset.
+        "env_required": ["DB_HOST", "DB_PORT", "DB_NAME", "DB_USER", "DB_PASSWORD"],
+        "env_optional": {"DB_SSLMODE": "require"},
+    },
+    "pinnacle_sf": {
+        "driver_type": "snowflake",
+        "display_name": "Pinnacle SF",
+        "scope_template": "{db}.{schema}",
+        "env_required": ["SF_ACCOUNT", "SF_DATABASE"],
+        "env_optional": {
+            "SF_USER": "",
+            "SF_PASSWORD": "",
+            "SF_AUTHENTICATOR": "externalbrowser",
+            "SF_ROLE": "",
+            "SF_WAREHOUSE": "COMPUTE_WH",
+            "SF_SCHEMA": "ANALYTICS",
+        },
+    },
+}
+
+
+class PresetSummary(BaseModel):
+    name: str
+    label: str
+    driver_type: str
+    available: bool
+    missing_env: list[str] = Field(default_factory=list)
+
+
+class PresetListResponse(BaseModel):
+    presets: list[PresetSummary]
+
+
+def _build_preset_payload(name: str) -> AddConnectionRequest | None:
+    import os
+
+    spec = _PRESETS.get(name)
+    if spec is None:
+        return None
+    missing = [k for k in spec["env_required"] if not os.environ.get(k)]
+    if missing:
+        return None
+
+    if name == "pinnacle_pg":
+        host = os.environ["DB_HOST"]
+        port = int(os.environ.get("DB_PORT", "5432"))
+        db = os.environ["DB_NAME"]
+        return AddConnectionRequest(
+            driver_type=DriverType.POSTGRESQL,
+            display_name=spec["display_name"],
+            endpoint=f"{host}:{port}",
+            scope=spec["scope_template"].format(db=db),
+            credentials={
+                "host": host,
+                "port": port,
+                "database": db,
+                "user": os.environ["DB_USER"],
+                "password": os.environ["DB_PASSWORD"],
+                "sslmode": os.environ.get("DB_SSLMODE", "require"),
+            },
+            tags=["pinnacle", "preset"],
+        )
+    if name == "pinnacle_sf":
+        account = os.environ["SF_ACCOUNT"]
+        db = os.environ["SF_DATABASE"]
+        schema = os.environ.get("SF_SCHEMA", "ANALYTICS")
+        return AddConnectionRequest(
+            driver_type=DriverType.SNOWFLAKE,
+            display_name=spec["display_name"],
+            endpoint=account,
+            scope=spec["scope_template"].format(db=db, schema=schema),
+            credentials={
+                "account": account,
+                "user": os.environ.get("SF_USER", ""),
+                "password": os.environ.get("SF_PASSWORD", ""),
+                "authenticator": os.environ.get("SF_AUTHENTICATOR", "externalbrowser"),
+                "role": os.environ.get("SF_ROLE", ""),
+                "warehouse": os.environ.get("SF_WAREHOUSE", "COMPUTE_WH"),
+                "database": db,
+                "schema": schema,
+            },
+            tags=["pinnacle", "preset"],
+        )
+    return None
+
+
+@router.get("/workspace/connection-presets", response_model=PresetListResponse)
+async def list_presets(
+    ctx: Annotated[SessionContext, Depends(get_session_context)],  # noqa: ARG001
+) -> PresetListResponse:
+    """List demo presets + which ones are wired up via .env."""
+    import os
+
+    out: list[PresetSummary] = []
+    for name, spec in _PRESETS.items():
+        missing = [k for k in spec["env_required"] if not os.environ.get(k)]
+        out.append(
+            PresetSummary(
+                name=name,
+                label=spec["display_name"],
+                driver_type=spec["driver_type"],
+                available=not missing,
+                missing_env=missing,
+            )
+        )
+    return PresetListResponse(presets=out)
+
+
+@router.post(
+    "/workspace/connection-presets/{name}",
+    response_model=Connection,
+    status_code=status.HTTP_201_CREATED,
+)
+async def use_preset(
+    name: str,
+    ctx: Annotated[SessionContext, Depends(get_session_context)],
+) -> Connection:
+    """One-click add a connection from server-side .env vars."""
+    payload = _build_preset_payload(name)
+    if payload is None:
+        spec = _PRESETS.get(name)
+        if spec is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"code": "unknown_preset", "message": f"no preset {name!r}"},
+            )
+        import os
+
+        missing = [k for k in spec["env_required"] if not os.environ.get(k)]
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "preset_unavailable",
+                "message": f"preset {name!r} requires env vars: {missing}",
+                "missing_env": missing,
+            },
+        )
+    # Reuse the same code path as the manual add — keeps deduping,
+    # activity-log, lifecycle scheduling all uniform.
+    return await add_connection(payload, ctx)
+
+
 @router.delete(
     "/workspace/connection/{connection_id}",
     status_code=status.HTTP_204_NO_CONTENT,

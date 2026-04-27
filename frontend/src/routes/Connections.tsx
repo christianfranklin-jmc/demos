@@ -10,10 +10,12 @@ import { useTheme } from "../context/ThemeContext";
 import { useWorkspace } from "../hooks/useWorkspace";
 import AddConnectionModal from "../components/workspace/AddConnectionModal";
 import ConnectionCard from "../components/workspace/ConnectionCard";
+import PresetButtons from "../components/workspace/PresetButtons";
 import WorkspaceKPIStrip from "../components/workspace/WorkspaceKPIStrip";
 
 export default function Connections() {
-  const { connections, kpis, isLoading, error, add, remove, retry } = useWorkspace();
+  const { connections, kpis, isLoading, error, add, remove, retry, refresh } =
+    useWorkspace();
   const { theme } = useTheme();
   const [modalOpen, setModalOpen] = useState(false);
 
@@ -50,6 +52,8 @@ export default function Connections() {
       </header>
 
       <WorkspaceKPIStrip kpis={kpis} />
+
+      <PresetButtons onAdded={() => void refresh()} />
 
       {error ? (
         <div

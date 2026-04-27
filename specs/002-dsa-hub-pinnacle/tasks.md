@@ -380,6 +380,7 @@ description: "Task list — DSA Hub Pinnacle Cross-Source"
 
 ### Demo mode
 
+- [X] T143a **Phase 10e** Connection presets — `GET /workspace/connection-presets` + `POST /workspace/connection-presets/{name}` read server-side .env vars (`DB_HOST`/`DB_NAME`/`DB_USER`/… for `pinnacle_pg`; `SF_ACCOUNT`/`SF_DATABASE`/… for `pinnacle_sf`) and one-click add a Connection through the existing `add_connection()` path (deduping/activity-log/lifecycle preserved). Frontend `PresetButtons.tsx` on the Connections page surfaces `Use Pinnacle PG` / `Use Pinnacle SF` buttons grayed out when the preset's required env is missing. Credentials never leave the server bundle.
 - [ ] T143 Verify SC-009 — `DSA_HUB_DEMO_MODE=1` reproduces the full multi-source narrative offline. **The deterministic backend (pill_generator, semantic_agent, delivery_agent stubs) is offline-capable today. The frontend demo-mode canned scenario (T064) — pre-staged Pinnacle PG + SF + Iceberg connections, scripted DAG run, scripted TTYD — remains DEFERRED until live-AWS rehearsal exposes which steps need canning vs. real.**
 
 ### Docs
