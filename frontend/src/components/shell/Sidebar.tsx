@@ -173,7 +173,12 @@ export default function Sidebar({
 
   return (
     <aside
-      className="flex flex-col border-r shrink-0 h-full"
+      // 002-dsa-hub-pinnacle: overflow-y-auto so the bottom-anchored
+      // ConnectionForm + Settings trigger remain reachable when the new
+      // top-level nav items push the natural content height past the
+      // viewport. Without this the connect button is clipped on shorter
+      // screens.
+      className="flex flex-col border-r shrink-0 h-full overflow-y-auto"
       style={{
         width: `${theme.layout.sidebarWidth}px`,
         minWidth: `${theme.layout.sidebarWidth}px`,
