@@ -16,24 +16,31 @@ export default function SuggestedReplies({ replies, onSelect }: SuggestedReplies
   // in ChatPanel, so capping at 3 would hide valid follow-ups for no reason.
   const maxReplies = Math.max(theme.agent.maxSuggestedReplies ?? 3, 6);
   const displayReplies = replies.slice(0, maxReplies);
+  // Content-based key. ChatPanel rebuilds `replies` via `.filter()` on every
+  // render — a fresh array reference. Without this stable key the effect
+  // re-fired on every parent render, clearing the staggered timeouts before
+  // they could elapse and leaving every pill stuck at opacity:0 (invisible
+  // but still clickable, since opacity:0 keeps pointer events).
+  const repliesKey = displayReplies.join("␟");
 
   useEffect(() => {
     setVisibleCount(0);
     timersRef.current.forEach(clearTimeout);
     timersRef.current = [];
 
-    displayReplies.forEach((_, i) => {
+    const count = repliesKey ? repliesKey.split("␟").length : 0;
+    for (let i = 0; i < count; i += 1) {
       const timer = setTimeout(() => {
         setVisibleCount((prev) => prev + 1);
       }, TIMING.SUGGESTED_REPLY_APPEAR_DELAY + i * TIMING.SUGGESTED_REPLY_STAGGER);
       timersRef.current.push(timer);
-    });
+    }
 
     return () => {
       timersRef.current.forEach(clearTimeout);
       timersRef.current = [];
     };
-  }, [replies]);
+  }, [repliesKey]);
 
   if (displayReplies.length === 0) return null;
 

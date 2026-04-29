@@ -45,6 +45,7 @@ const STATUS_COPY: Record<ConnectionStatus, string> = {
 // inlined here so US1 is self-contained without touching the theme system.
 const STATUS_SUCCESS = "#16A34A";
 const STATUS_ERROR = "#DC2626";
+const STATUS_WARN = "#D97706";
 
 function statusColor(theme: { colors: Record<string, string> }, s: ConnectionStatus): string {
   switch (s) {
@@ -141,6 +142,20 @@ export default function ConnectionCard({ connection, onRetry, onRemove }: Props)
           }}
         >
           {error.message}
+        </div>
+      ) : status === "live" && kpis.tables_total === 0 ? (
+        <div
+          role="alert"
+          data-testid="empty-scope-warning"
+          className="text-xs px-3 py-2 rounded"
+          style={{
+            color: STATUS_WARN,
+            backgroundColor: `${STATUS_WARN}14`,
+          }}
+        >
+          Scan succeeded but found 0 tables in scope <code>{connection.scope}</code>.
+          Check the schema name (case-sensitive) and remove + re-add this
+          connection if needed.
         </div>
       ) : null}
 

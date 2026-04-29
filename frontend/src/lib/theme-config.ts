@@ -238,11 +238,7 @@ export const SANA_THEME: ThemeConfig = {
     showStepNumbers: true,
     showStatusDots: true,
     newItemLabel: "+ New chat",
-    navItems: [
-      { icon: "⚡", label: "Workflows" },
-      { icon: "🔍", label: "Search" },
-      { icon: "📅", label: "Meetings" },
-    ],
+    navItems: [],
   },
   steps: {
     step0Label: "Stakeholder Alignment",

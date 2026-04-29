@@ -13,9 +13,18 @@ import logging
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+# Auto-load `.env` from the repo root so `uv run uvicorn …` picks up the
+# Pinnacle DB/SF credentials even when the operator forgot to `source .env`.
+# Existing process env wins (override=False) so deployed-mode injected vars
+# are never clobbered. Silent no-op if the file is missing.
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+load_dotenv(_REPO_ROOT / ".env", override=False)
 
 from .routes_discover import router as discover_router
 from .routes_health import router as health_router

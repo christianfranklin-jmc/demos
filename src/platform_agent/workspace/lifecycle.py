@@ -137,9 +137,14 @@ async def _real_scan(conn: Connection, workspace_id: UUID) -> ConnectionKPIs:
             await asyncio.to_thread(driver.close)
 
     tables = meta.get("tables", []) if isinstance(meta, dict) else []
+    # Drivers vary on the key name: PostgreSQL/Redshift/Snowflake emit
+    # `row_count`; the Iceberg driver emits `row_count_estimate`. Accept
+    # either so the workspace KPI rollup matches what the user sees per-card.
     return ConnectionKPIs(
         tables_total=len(tables),
-        rows_estimated=sum(int(t.get("row_count_estimate") or 0) for t in tables),
+        rows_estimated=sum(
+            int(t.get("row_count") or t.get("row_count_estimate") or 0) for t in tables
+        ),
         processes_detected=0,  # filled in by US2 discovery, not by raw scan
     )
 

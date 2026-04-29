@@ -18,6 +18,7 @@ dependencies = [
     "aiofiles>=24.1",
     "pydantic>=2.9",
     "python-jose[cryptography]>=3.3",  # Cognito JWT verification
+    "python-dotenv>=1.0",  # auto-load .env on FastAPI startup
     # 002-dsa-hub-pinnacle: cross-source scratchpad + Iceberg/Glue driver
     "duckdb>=1.1",
     "pyiceberg[glue]>=0.7",

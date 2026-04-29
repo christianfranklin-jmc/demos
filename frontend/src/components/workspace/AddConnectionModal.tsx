@@ -64,7 +64,7 @@ const INITIAL: FormState = {
   sfRole: "",
   sfWarehouse: "",
   sfDatabase: "",
-  sfSchema: "PUBLIC",
+  sfSchema: "ANALYTICS",
   sfUser: "",
   sfPassword: "",
   glueDatabase: "",
