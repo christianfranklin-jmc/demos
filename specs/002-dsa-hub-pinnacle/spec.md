@@ -2,7 +2,7 @@
 
 **Feature Branch**: `002-dsa-hub-pinnacle`
 **Created**: 2026-04-26
-**Status**: Draft
+**Status**: Shipped (merged to `main` 2026-04-30 — Phases 1–10f complete; deferred items consolidated in `tasks.md` § Deferred (post-merge))
 **Input**: Evolve the DSA Platform from a single-source workflow into a multi-source hub where two Pinnacle warehouses (operational PostgreSQL + analytical Snowflake) are auto-discovered down to their business processes, where the user can launch prebuilt "pilled" PRDs that combine both sources into governed Iceberg data products, and where every step from discovery through provisioning through validation is visualized with live KPIs and an agent DAG.
 
 ## Clarifications

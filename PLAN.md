@@ -35,6 +35,8 @@ the 101-task breakdown, 16 commits to date):
 9. Phase 7 regression smokes (Streamlit + CLI) — landed.
 10. Phase 8 polish (docs + lint + quickstart acceptance) — in progress.
 
+**Feature 002 (DSA Hub × Pinnacle cross-source) — shipped 2026-04-30.** Multi-source workspace hub, six new top-level views, 7-agent provisioning DAG into Iceberg, cross-source TTYD via DuckDB, per-connection Semantic Graph, Redundancy Gate, Standards page. See `specs/002-dsa-hub-pinnacle/` and the Phase 9 entry in `CLAUDE.md` for the full record. Deferred items consolidated in `specs/002-dsa-hub-pinnacle/tasks.md` § Deferred (post-merge).
+
 ## Quick Start: Local (Streamlit)
 
 Fastest path — runs the agent locally against a PostgreSQL database.

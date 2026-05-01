@@ -5,6 +5,8 @@ Combined repo — the DSA MVP's polished 4-step data-product UX (React + Vite + 
 **What it does**: connect to a real database → walk through **Requirements → Conceptual Model → Logical Model → Detailed Spec** → download a runnable dbt project scaffolded from actual customer tables. Three source types (PostgreSQL, Redshift, Snowflake with SSO). Offline demo mode for network-constrained rooms.
 
 > Upstream histories preserved: `src/platform_agent/*` came from PlatformAgent; `frontend/*` came from DSA's `feat-enhancements-erd-visuals`. Integration tracked under `specs/001-dsa-agent-integration/` (spec, plan, tasks, contracts) and `docs/adr/015-dsa-agent-integration.md`.
+>
+> **Feature 002 (DSA Hub × Pinnacle, shipped 2026-04-30)** evolves the platform from single-source to multi-source: a per-tab workspace owns N connections (Postgres + Snowflake + Iceberg/Glue), six new top-level views (Connections / Discovery / Build / Semantic / Standards / Workflow), a 7-agent provisioning DAG that lands governed Iceberg data products, and cross-source Talk-to-Data via an in-process DuckDB scratchpad. See `specs/002-dsa-hub-pinnacle/` and ADRs 016–021.
 
 ## Quick Start (local, end-to-end)
 

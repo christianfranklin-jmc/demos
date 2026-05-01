@@ -535,3 +535,53 @@ Each US is independently testable and rolls up cleanly through Polish.
 - **Avoid**: vague tasks, same-file conflicts, cross-story dependencies that break US independence, batched ADR commits.
 - **Three-frontend rule** (Article II + CLAUDE.md): every UI surface introduced (Connections, Step 1 Discovery, Build, Semantic, Standards) must have a CLI text-mode equivalent. CLI tasks are intentionally *not* enumerated separately — each backend route lands a small `python -m platform_agent ...` subcommand alongside in the same task (e.g., `dsa-hub workspace add-connection`, `dsa-hub provision status <run_id>`, `dsa-hub semantic show --connection <id>`).
 - **Streamlit alternate frontend**: continues to support single-source flows (FR-040). Multi-source UI is React-only in v1; Streamlit remains valid for the pre-existing Talk-to-Data demo.
+
+---
+
+## Phase 10 progress addendum (post-T133–T146 commits)
+
+These commits landed after the original Phase 10 enumeration and promote five of the seven provisioning agents from deterministic stubs to real-path implementations. They are tracked here rather than as new T-IDs because they are sub-steps of the existing T070–T075 agent set, finished iteratively as live-environment access exposed gaps.
+
+- **Phase 10a (already in T070-T075 commits)** — initial stub agents wired into the orchestrator.
+- **Phase 10b** (`fa9d4a6`) — `schema_agent` + `mapping_agent` promoted to the real Iceberg-write path (pyiceberg `Table.create` against Glue Catalog; mapping writes RDF triples into the per-connection store).
+- **Phase 10c** (`7e3ec34`) — `pipeline_agent` promoted to real source pulls + Parquet landing (uses the connection's `DatabaseDriver.run_query` with the 250-row cap; lands intermediate Parquet to S3 via boto3).
+- **Phase 10d** (`f044802`) — `model_agent` promoted (writes dbt models to the per-connection workspace; honors `dbt_config()` per driver) + `semantic_agent` FK-ordering bug fixed (joins now emit in dependency order so downstream consumers see referenced entities first).
+- **Phase 10e** (`8c45d17`) — one-click Pinnacle connection presets: `GET /workspace/connection-presets` + `POST /workspace/connection-presets/{name}` read server-side `.env` (`DB_*` for `pinnacle_pg`; `SF_*` for `pinnacle_sf`) and add a Connection through the existing `add_connection()` path. `PresetButtons.tsx` on the Connections page surfaces `Use Pinnacle PG` / `Use Pinnacle SF` buttons (grayed when env missing). Credentials never leave the server bundle.
+- **Phase 10f** (`b196265`) — Pinnacle connection reliability fixes: Snowflake schema defaults to `ANALYTICS` (was `PUBLIC` → silently scanned empty schema and showed "Live · 0 tables"); workspace KPI strip sums per-driver `row_count` (was looking for an Iceberg-only key); connection cards show an amber alert when a Live connection scanned 0 tables, naming the scope so a schema typo can't masquerade as healthy.
+- **Sidebar fix** (`0464585`) — sidebar gains overflow scroll so the Connect button stays reachable on short viewports (originally surfaced during demo dry-run).
+
+`query_agent` (cross-source NL→SQL planner) and `delivery_agent` LLM-as-judge swap remain on the deterministic v1 path per ADR-018 D2 / ADR-020 D5.
+
+---
+
+## Deferred (post-merge)
+
+Items deliberately held back from the v1 merge. None block correctness or the demo path; each is gated on an external dependency or a deliberate v2 design decision.
+
+### Live-environment verification (need real AWS + Snowflake reachable concurrently)
+
+- **T137** — SC-002 60s ceiling on second-connection-live → 8 process cards. Backend smoke-tested at <2s; live demo measurement pending.
+- **T138** — SC-005 5s ceiling on cross-source TTYD. DuckDB scratchpad benchmark <100ms; live PG+SF concurrent measurement pending.
+- **T139** — US-3 acceptance #2: 1s state-transition render. SSE→React parser <50ms locally; browser-timeline confirmation pending.
+- **T140** — US-6 acceptance #4: 30s validation per business question. Stub validator resolves in ms; realistic measurement is the LLM-as-judge swap.
+- **T141** — SC-001 8-minute end-to-end showcase. Backend round-trip <500ms on stub agents; pacing dominated by user input + (deferred) live dbt-glue execution.
+- **T147** — Walk through `quickstart.md` §1–§9 end-to-end against a freshly bootstrapped AWS environment.
+
+### LLM agent swaps (gated on Strands prompt authoring + eval cases)
+
+- **T049, T053, T076, T114, T142** — Eval case sets and system prompts for `pill_agent`, `redundancy_agent`, `semantic_agent`, `delivery_agent`. v1 deterministic generators are fully covered by 144 pytest contract + integration tests. Swaps land per ADR-018 D2 / ADR-019 D2 / ADR-020 D5 / ADR-021 D2.
+- **T094** — LLM-driven NL→SQL planner for cross-source TTYD. v1 callers supply pulls + join SQL directly; deterministic path covered by 5 contract + 7 integration tests.
+- **T104, T105, T115, T127** — `@tool` wrappers for `semantic_graph_read/write`, `redundancy_check`, `standards_read`. v1 routes read/write the per-connection store directly; wrappers land alongside their consuming Strands agent.
+- **T116** — `prompts/redundancy_agent.md` (companion to T115).
+
+### Deployment-mode-only (local mode unblocked)
+
+- **T023** — Terraform DynamoDB table for `DSAHubConnectionStore` + IAM policy fragment. Local-mode SQLite path covers MVP + US1; tracked for the deployed-mode rollout.
+- **T029** — `seed_pinnacle_snowflake.sql` regenerator. Snowflake side already populated at `lga76011` / `PINNACLE_FINANCIAL_DEMO_ASINGH`; pending user confirmation on whether a regenerator script is needed.
+
+### UI polish (cleanest path is a follow-up slice)
+
+- **T100** — Wire `SourceChips` + `TtydKPIBar` into `frontend/src/components/artifact/TalkToData.tsx`. Components are vitest-tested standalone; cleanest integration is a separate cross-source TTYD panel that lives alongside the existing single-source path when `lens="all"`.
+- **T101** — UI client-side read-only pre-check (backend is authoritative; route returns `400 read_only_violation` and chips color-code truncation/error today).
+- **T143** — Frontend `DSA_HUB_DEMO_MODE=1` canned scenario (pre-staged Pinnacle PG+SF+Iceberg, scripted DAG, scripted TTYD). Backend deterministic path is offline-capable today; canning waits on live-AWS rehearsal exposing which steps need it vs. real.
+- **T145** — Root `README.md` quickstart polish. Feature-specific quickstart in `specs/002-dsa-hub-pinnacle/quickstart.md` is authoritative; root README will sync with the next release tag.
