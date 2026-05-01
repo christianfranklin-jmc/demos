@@ -1,0 +1,106 @@
+openapi: 3.0.3
+info:
+  title: DSA Hub — Cross-Source Talk-to-Data (extension)
+  version: "1.0.0"
+  description: |
+    Extends the existing `POST /workflow/query` route with cross-source planning.
+    When `lens=all` and the workspace has ≥2 live connections, the planner may
+    produce per-source pulls + a DuckDB scratchpad join (research R4). Existing
+    single-source request shape continues to work unchanged.
+
+paths:
+  /workflow/query:
+    post:
+      summary: Ask a Talk-to-Data question.
+      parameters:
+        - $ref: "./workspace.openapi.yaml#/components/parameters/SessionHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/QueryRequest" }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/QueryResponse" }
+        "400":
+          description: |
+            One of:
+              - `read_only_violation`: write keyword detected anywhere in the planned SQL.
+              - `cross_source_unavailable`: lens=all but workspace has <2 live connections.
+              - `lens_missing`: lens not provided.
+
+components:
+  schemas:
+    QueryRequest:
+      type: object
+      required: [question, lens]
+      properties:
+        question: { type: string, minLength: 1 }
+        lens:
+          oneOf:
+            - type: string
+              enum: [all]
+            - type: object
+              required: [connection_id]
+              properties:
+                connection_id: { type: string }
+        # Optional: target an already-built Iceberg product directly.
+        target_product_id:
+          type: string
+          nullable: true
+          description: When set, the planner is constrained to query this registered Iceberg product.
+
+    QueryResponse:
+      type: object
+      required: [answer, plan, sources_used]
+      properties:
+        answer: { type: string, description: "Natural-language answer." }
+        plan:
+          type: object
+          properties:
+            kind: { type: string, enum: [single_source, cross_source] }
+            per_source_pulls:
+              type: array
+              items:
+                type: object
+                properties:
+                  connection_id: { type: string }
+                  scope: { type: string }
+                  sql: { type: string }
+                  rows_returned: { type: integer }
+                  truncated_at_cap: { type: boolean }
+            join_step:
+              nullable: true
+              type: object
+              properties:
+                duckdb_sql: { type: string }
+                rows_returned: { type: integer }
+                truncated_at_cap: { type: boolean }
+        sources_used:
+          type: array
+          items:
+            type: object
+            properties:
+              connection_id: { type: string }
+              driver_type: { type: string }
+              row_count: { type: integer }
+              chip_label: { type: string, description: "UI display label, e.g., '🐘 Postgres · public · 184 rows'." }
+        semantic_hits:
+          type: array
+          items:
+            type: object
+            properties:
+              metric_id: { type: string, nullable: true }
+              entity_id: { type: string, nullable: true }
+              connection_id: { type: string }
+              chip_label: { type: string }
+        kpi_snapshot:
+          type: object
+          properties:
+            queries_answered_today: { type: integer }
+            avg_latency_ms: { type: integer }
+            sources_used_today: { type: integer }
+            semantic_hit_rate: { type: number, minimum: 0, maximum: 1 }
+        latency_ms: { type: integer }

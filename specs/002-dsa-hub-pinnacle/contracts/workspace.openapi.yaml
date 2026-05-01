@@ -1,0 +1,162 @@
+openapi: 3.0.3
+info:
+  title: DSA Hub — Workspace & Connections
+  version: "1.0.0"
+  description: |
+    Per-tab workspace surface. Connections are added/removed; the workspace's
+    KPI strip aggregates across live connections. State is per-tab in-memory
+    server-side; durable per-connection assets live in each connection's
+    own store (see semantic.openapi.yaml + provision.openapi.yaml).
+
+paths:
+  /workspace/connections:
+    get:
+      summary: List connections in the current workspace.
+      parameters:
+        - $ref: "#/components/parameters/SessionHeader"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  connections:
+                    type: array
+                    items: { $ref: "#/components/schemas/Connection" }
+                required: [connections]
+
+  /workspace/connection:
+    post:
+      summary: Add a connection to the current workspace.
+      parameters:
+        - $ref: "#/components/parameters/SessionHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AddConnectionRequest" }
+      responses:
+        "201":
+          description: Created (status begins at "connecting").
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Connection" }
+        "400":
+          description: Validation error (bad endpoint, unsupported driver, etc.)
+        "409":
+          description: Duplicate (driver_type, endpoint, scope) tuple already in workspace.
+
+  /workspace/connection/{connection_id}:
+    delete:
+      summary: Remove a connection from the workspace. Does NOT delete its durable store.
+      parameters:
+        - $ref: "#/components/parameters/SessionHeader"
+        - in: path
+          name: connection_id
+          required: true
+          schema: { type: string }
+      responses:
+        "204":
+          description: Removed.
+        "404":
+          description: Connection not in this workspace.
+
+  /workspace/connection/{connection_id}/retry:
+    post:
+      summary: Retry an errored connection.
+      parameters:
+        - $ref: "#/components/parameters/SessionHeader"
+        - in: path
+          name: connection_id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Retry initiated; status returns to "connecting".
+
+  /workspace/kpis:
+    get:
+      summary: Aggregate KPI strip for the workspace.
+      parameters:
+        - $ref: "#/components/parameters/SessionHeader"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WorkspaceKPIs" }
+
+components:
+  parameters:
+    SessionHeader:
+      in: header
+      name: X-DSA-Session-ID
+      required: true
+      schema: { type: string, format: uuid }
+      description: Per-tab session UUID. `X-DSA-Workspace-ID` is accepted as a synonym for one minor version (FR-006).
+
+  schemas:
+    AddConnectionRequest:
+      type: object
+      required: [driver_type, display_name, endpoint, scope, credentials]
+      properties:
+        driver_type:
+          type: string
+          enum: [postgresql, redshift, snowflake, databricks, iceberg]
+        display_name: { type: string, minLength: 1, maxLength: 80 }
+        endpoint: { type: string }
+        scope: { type: string }
+        credentials:
+          type: object
+          description: |
+            Driver-specific credential payload. Held in per-tab session memory only;
+            never persisted to disk in local mode. Deployed mode requires
+            `credential_ref` (Secrets Manager ARN) instead of inline secrets.
+          additionalProperties: true
+        tags:
+          type: array
+          items: { type: string }
+
+    Connection:
+      type: object
+      required: [connection_id, driver_type, display_name, endpoint, scope, status, kpis, added_at]
+      properties:
+        connection_id: { type: string, description: "SHA-256 of (driver_type, endpoint, scope)" }
+        driver_type: { type: string }
+        display_name: { type: string }
+        endpoint: { type: string }
+        scope: { type: string }
+        status:
+          type: string
+          enum: [connecting, scanning, live, error]
+        error:
+          nullable: true
+          type: object
+          properties:
+            code: { type: string }
+            message: { type: string }
+            retryable: { type: boolean }
+        kpis: { $ref: "#/components/schemas/ConnectionKPIs" }
+        added_at: { type: string, format: date-time }
+        last_synced_at: { type: string, format: date-time, nullable: true }
+        tags:
+          type: array
+          items: { type: string }
+
+    ConnectionKPIs:
+      type: object
+      properties:
+        tables_total: { type: integer }
+        rows_estimated: { type: integer }
+        processes_detected: { type: integer }
+
+    WorkspaceKPIs:
+      type: object
+      properties:
+        sources_connected: { type: integer }
+        tables_total: { type: integer }
+        rows_total: { type: integer }
+        processes_detected: { type: integer }
+        semantic_entities_total: { type: integer }
+        last_updated: { type: string, format: date-time }

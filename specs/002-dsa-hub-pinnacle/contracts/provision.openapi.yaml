@@ -1,0 +1,292 @@
+openapi: 3.0.3
+info:
+  title: DSA Hub — Provisioning Orchestrator
+  version: "1.0.0"
+  description: |
+    Provisioning surface for the 7-agent DAG (US-3). Acceptance creates a
+    ProvisioningRun; clients subscribe to the SSE stream for live agent state
+    transitions, KPI ticks, validation results, and the terminal registration
+    of an Iceberg Data Product (final or provisional per Q5).
+
+    Event schema is **v2**, additive over the existing v1 SSE parser.
+
+paths:
+  /workflow/provision:
+    post:
+      summary: Accept a PRD and queue a provisioning run.
+      parameters:
+        - $ref: "./workspace.openapi.yaml#/components/parameters/SessionHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [prd, redundancy_report_id]
+              properties:
+                prd: { $ref: "./pills.openapi.yaml#/components/schemas/PRDDraft" }
+                redundancy_report_id: { type: string, description: "Must be cleared_to_provision (FR-026)." }
+      responses:
+        "201":
+          description: Run queued.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProvisioningRun" }
+        "400":
+          description: |
+            One of:
+              - `redundancy_not_cleared`: report state is `duplicate` without override.
+              - `no_iceberg_target`: workspace has no live iceberg-driver connection (FR-031, Q3).
+              - `read_only_violation`: a `source_pulls.sql` contains a write keyword.
+              - `prd_invalid`: missing business_questions / standards_applied / target.
+
+  /workflow/provision/{run_id}:
+    get:
+      summary: Snapshot of run state (for CLI/text-mode consumers).
+      parameters:
+        - $ref: "./workspace.openapi.yaml#/components/parameters/SessionHeader"
+        - in: path
+          name: run_id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProvisioningRun" }
+
+  /workflow/provision/{run_id}/events:
+    get:
+      summary: SSE stream of provisioning events (schema v2).
+      parameters:
+        - $ref: "./workspace.openapi.yaml#/components/parameters/SessionHeader"
+        - in: path
+          name: run_id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: |
+            text/event-stream. Each event: `event: <kind>\ndata: <json>\n\n`.
+            All events carry `{run_id, seq, ts, v: 2}` envelope plus kind-specific payload.
+          content:
+            text/event-stream:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/EventAgentStarted"
+                  - $ref: "#/components/schemas/EventAgentProgress"
+                  - $ref: "#/components/schemas/EventAgentCompleted"
+                  - $ref: "#/components/schemas/EventAgentFailed"
+                  - $ref: "#/components/schemas/EventKpiTick"
+                  - $ref: "#/components/schemas/EventArtifactProduced"
+                  - $ref: "#/components/schemas/EventValidationStarted"
+                  - $ref: "#/components/schemas/EventValidationResult"
+                  - $ref: "#/components/schemas/EventRunCompleted"
+                  - $ref: "#/components/schemas/EventRunNeedsReplan"
+                  - $ref: "#/components/schemas/EventHeartbeat"
+
+  /workflow/provision/{run_id}/retry:
+    post:
+      summary: Retry a failed agent (FR-029) or rerun the validation step (FR-035).
+      parameters:
+        - $ref: "./workspace.openapi.yaml#/components/parameters/SessionHeader"
+        - in: path
+          name: run_id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [agent_id]
+              properties:
+                agent_id:
+                  type: string
+                  enum: [schema, pipeline, model, quality, mapping, semantic, delivery, validation]
+      responses:
+        "202":
+          description: Retry queued; subscribe to the events stream for progress.
+        "409":
+          description: Run not in a retryable state.
+
+components:
+  schemas:
+    ProvisioningRun:
+      type: object
+      required: [run_id, workspace_id, prd_id, target_connection_id, state, agents]
+      properties:
+        run_id: { type: string }
+        workspace_id: { type: string, format: uuid }
+        prd_id: { type: string }
+        target_connection_id: { type: string }
+        state:
+          type: string
+          enum: [queued, running, completed, needs_replan, failed]
+        agents:
+          type: array
+          items: { $ref: "#/components/schemas/AgentExecution" }
+        kpi_series:
+          type: array
+          items: { $ref: "#/components/schemas/KpiTick" }
+        validation_pass_rate: { type: number, minimum: 0, maximum: 1, nullable: true }
+        final_product_id: { type: string, nullable: true }
+        started_at: { type: string, format: date-time, nullable: true }
+        completed_at: { type: string, format: date-time, nullable: true }
+
+    AgentExecution:
+      type: object
+      required: [agent_id, state, attempt]
+      properties:
+        agent_id:
+          type: string
+          enum: [schema, pipeline, model, quality, mapping, semantic, delivery]
+        state:
+          type: string
+          enum: [pending, active, completed, failed, retrying]
+        attempt: { type: integer, minimum: 1 }
+        started_at: { type: string, format: date-time, nullable: true }
+        completed_at: { type: string, format: date-time, nullable: true }
+        artifacts:
+          type: array
+          items:
+            type: object
+            properties:
+              kind: { type: string }
+              ref: { type: string, description: "FQN, file path, or product_id." }
+              meta: { type: object, additionalProperties: true }
+        error:
+          nullable: true
+          type: object
+          properties:
+            code: { type: string }
+            message: { type: string }
+            retryable: { type: boolean }
+        latency_ms_p95: { type: integer, nullable: true }
+
+    KpiTick:
+      type: object
+      properties:
+        ts: { type: string, format: date-time }
+        rows_in_motion: { type: integer }
+        agents_active: { type: integer }
+        files_written: { type: integer }
+        latency_ms_p95: { type: integer, nullable: true }
+        est_cost_usd: { type: number, nullable: true }
+        eta_seconds: { type: integer, nullable: true }
+
+    EventEnvelope:
+      type: object
+      required: [run_id, seq, ts, v]
+      properties:
+        run_id: { type: string }
+        seq: { type: integer, minimum: 0 }
+        ts: { type: string, format: date-time }
+        v: { type: integer, enum: [2] }
+
+    EventAgentStarted:
+      allOf:
+        - $ref: "#/components/schemas/EventEnvelope"
+        - type: object
+          properties:
+            kind: { type: string, enum: [agent.started] }
+            agent_id: { type: string }
+            attempt: { type: integer }
+
+    EventAgentProgress:
+      allOf:
+        - $ref: "#/components/schemas/EventEnvelope"
+        - type: object
+          properties:
+            kind: { type: string, enum: [agent.progress] }
+            agent_id: { type: string }
+            message: { type: string }
+
+    EventAgentCompleted:
+      allOf:
+        - $ref: "#/components/schemas/EventEnvelope"
+        - type: object
+          properties:
+            kind: { type: string, enum: [agent.completed] }
+            agent_id: { type: string }
+            artifacts:
+              type: array
+              items: { $ref: "#/components/schemas/AgentExecution/properties/artifacts/items" }
+
+    EventAgentFailed:
+      allOf:
+        - $ref: "#/components/schemas/EventEnvelope"
+        - type: object
+          properties:
+            kind: { type: string, enum: [agent.failed] }
+            agent_id: { type: string }
+            error:
+              type: object
+              properties:
+                code: { type: string }
+                message: { type: string }
+                retryable: { type: boolean }
+
+    EventKpiTick:
+      allOf:
+        - $ref: "#/components/schemas/EventEnvelope"
+        - type: object
+          properties:
+            kind: { type: string, enum: [kpi.tick] }
+            tick: { $ref: "#/components/schemas/KpiTick" }
+
+    EventArtifactProduced:
+      allOf:
+        - $ref: "#/components/schemas/EventEnvelope"
+        - type: object
+          properties:
+            kind: { type: string, enum: [artifact.produced] }
+            agent_id: { type: string }
+            artifact: { $ref: "#/components/schemas/AgentExecution/properties/artifacts/items" }
+
+    EventValidationStarted:
+      allOf:
+        - $ref: "#/components/schemas/EventEnvelope"
+        - type: object
+          properties:
+            kind: { type: string, enum: [validation.started] }
+            question_count: { type: integer }
+
+    EventValidationResult:
+      allOf:
+        - $ref: "#/components/schemas/EventEnvelope"
+        - type: object
+          properties:
+            kind: { type: string, enum: [validation.result] }
+            question: { type: string }
+            state: { type: string, enum: [passed, failed] }
+            sql_executed: { type: string, nullable: true }
+            latency_ms: { type: integer }
+            judge_reasoning: { type: string }
+
+    EventRunCompleted:
+      allOf:
+        - $ref: "#/components/schemas/EventEnvelope"
+        - type: object
+          properties:
+            kind: { type: string, enum: [run.completed] }
+            product_id: { type: string }
+            product_state: { type: string, enum: [final, provisional] }
+            validation_pass_rate: { type: number }
+
+    EventRunNeedsReplan:
+      allOf:
+        - $ref: "#/components/schemas/EventEnvelope"
+        - type: object
+          properties:
+            kind: { type: string, enum: [run.needs_replan] }
+            reason: { type: string }
+            suggested_agent: { type: string }
+
+    EventHeartbeat:
+      allOf:
+        - $ref: "#/components/schemas/EventEnvelope"
+        - type: object
+          properties:
+            kind: { type: string, enum: [heartbeat] }

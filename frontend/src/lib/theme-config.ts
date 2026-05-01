@@ -142,7 +142,7 @@ export interface ThemeConfig {
 
   // — Demo Scenario (swappable) —
   scenario: {
-    dataProductName: string;    // e.g. "ROMI Data Product"
+    dataProductName: string;    // e.g. "New Data Product"
     dataProductId: string;      // e.g. "dp-romi-001"
     ownerName: string;          // e.g. "Jennifer Moss"
     ownerTitle: string;         // e.g. "VP Marketing Operations"
@@ -238,11 +238,7 @@ export const SANA_THEME: ThemeConfig = {
     showStepNumbers: true,
     showStatusDots: true,
     newItemLabel: "+ New chat",
-    navItems: [
-      { icon: "⚡", label: "Workflows" },
-      { icon: "🔍", label: "Search" },
-      { icon: "📅", label: "Meetings" },
-    ],
+    navItems: [],
   },
   steps: {
     step0Label: "Stakeholder Alignment",
@@ -261,7 +257,7 @@ export const SANA_THEME: ThemeConfig = {
     gateIconType: "shield",
   },
   scenario: {
-    dataProductName: "ROMI Data Product",
+    dataProductName: "New Data Product",
     dataProductId: "dp-romi-001",
     ownerName: "Jennifer Moss",
     ownerTitle: "VP Marketing Operations",

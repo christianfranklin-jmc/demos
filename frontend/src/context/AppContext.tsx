@@ -41,6 +41,33 @@ interface AppState {
   demoMode: DemoModeState;             // Frontend-only fallback switch (ADR-015 D13).
   memoryStatus: MemoryStatus;          // FR-030 banner driver.
   sourceContext: DiscoveredSource | null; // Post-connection discovery (ADR-015 D18).
+  // 002-dsa-hub-pinnacle additions (US1 — multi-source workspace)
+  workspaceId: string;                                // Same value as sessionId (Q1, FR-006); exposed for clarity.
+  workspaceConnections: WorkspaceConnectionRef[];     // Cross-component mirror of /workspace/connections.
+  activeLens: WorkspaceLens;                          // Default: { kind: "all" } once ≥2 live connections; else first live.
+}
+
+// ─── Workspace types (002-dsa-hub-pinnacle) ───
+//
+// Lightweight mirror of the backend Connection so cross-cutting components
+// (ContextBar lens selector, sidebar) can read connection metadata without
+// owning the useWorkspace hook directly.
+export interface WorkspaceConnectionRef {
+  connection_id: string;
+  driver_type: "postgresql" | "redshift" | "snowflake" | "databricks" | "iceberg";
+  display_name: string;
+  scope: string;
+  status: "connecting" | "scanning" | "live" | "error";
+}
+
+export type WorkspaceLens =
+  | { kind: "all" }
+  | { kind: "connection"; connection_id: string };
+
+export interface LensOption {
+  kind: "all" | "connection";
+  connection_id?: string;
+  label: string;
 }
 
 // ─── Actions ───
@@ -76,7 +103,10 @@ type AppAction =
   | { type: "MEMORY_STATUS_SET"; status: MemoryStatus }
   | { type: "SOURCE_CONTEXT_SET"; context: DiscoveredSource }
   | { type: "SOURCE_CONTEXT_CLEAR" }
-  | { type: "WORKFLOW_INVALIDATE_DOWNSTREAM"; fromStep: StepNumber };
+  | { type: "WORKFLOW_INVALIDATE_DOWNSTREAM"; fromStep: StepNumber }
+  // 002-dsa-hub-pinnacle additions (US1)
+  | { type: "WORKSPACE_CONNECTIONS_SET"; connections: WorkspaceConnectionRef[] }
+  | { type: "LENS_SET"; lens: WorkspaceLens };
 
 // ─── Initial State ───
 
@@ -120,6 +150,10 @@ const initialState: AppState = {
   },
   memoryStatus: "healthy",
   sourceContext: null,
+  // 002-dsa-hub-pinnacle (US1)
+  workspaceId: "",
+  workspaceConnections: [],
+  activeLens: { kind: "all" },
 };
 
 // ─── Reducer ───
@@ -371,7 +405,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, ...action.state };
 
     case "SESSION_ID_SET":
-      return { ...state, sessionId: action.sessionId };
+      // 002-dsa-hub-pinnacle Q1: workspaceId is the same UUID as sessionId.
+      return { ...state, sessionId: action.sessionId, workspaceId: action.sessionId };
 
     case "CONNECTION_SET":
       // Connecting self-heals auto-enabled demo mode: the usual reason a
@@ -445,6 +480,25 @@ function appReducer(state: AppState, action: AppAction): AppState {
       };
     }
 
+    // 002-dsa-hub-pinnacle (US1)
+    case "WORKSPACE_CONNECTIONS_SET": {
+      const next = action.connections;
+      // Re-validate the active lens: if it points at a connection that's
+      // no longer present, fall back to "all".
+      const current = state.activeLens;
+      let lens: WorkspaceLens = current;
+      if (current.kind === "connection") {
+        const stillThere = next.some(
+          (c) => c.connection_id === current.connection_id
+        );
+        if (!stillThere) lens = { kind: "all" };
+      }
+      return { ...state, workspaceConnections: next, activeLens: lens };
+    }
+
+    case "LENS_SET":
+      return { ...state, activeLens: action.lens };
+
     default:
       return state;
   }
@@ -480,4 +534,26 @@ export function useAppState(): AppContextType {
   const ctx = useContext(AppContext);
   if (!ctx) throw new Error("useAppState must be used within AppProvider");
   return ctx;
+}
+
+// ─── Workspace lens helpers (002-dsa-hub-pinnacle US1) ───
+
+/**
+ * Derive the lens dropdown options from the current workspace connections.
+ * Always includes "All sources" as the first option once ≥2 live connections
+ * are present; otherwise only per-connection entries are shown.
+ */
+export function deriveLensOptions(
+  connections: WorkspaceConnectionRef[]
+): LensOption[] {
+  const live = connections.filter((c) => c.status === "live");
+  const opts: LensOption[] = live.map((c) => ({
+    kind: "connection",
+    connection_id: c.connection_id,
+    label: `${c.display_name} · ${c.scope}`,
+  }));
+  if (live.length >= 2) {
+    opts.unshift({ kind: "all", label: "All sources" });
+  }
+  return opts;
 }

@@ -17,7 +17,7 @@ export interface DataProduct {
 export const DATA_PRODUCTS: DataProduct[] = [
   {
     id: "dp-romi-001",
-    name: "ROMI Data Product",
+    name: "New Data Product",
     owner: "Jennifer Moss",
     currentStep: 1,
     overallStatus: "active",

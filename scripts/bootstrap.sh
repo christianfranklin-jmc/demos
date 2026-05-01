@@ -41,8 +41,8 @@ set -euo pipefail
 # Defaults
 # ---------------------------------------------------------------------------
 REGION="us-east-1"
-DB_INSTANCE_ID="platform-agent-northwinds"
-DB_NAME="northwinds"
+DB_INSTANCE_ID="platform-agent-pinnacle"
+DB_NAME="pinnacle"
 DB_USER="postgres"
 DB_PASSWORD="PlatformAgent2026!"
 DB_INSTANCE_CLASS="db.t3.micro"
@@ -341,23 +341,32 @@ fi
 # Step 6: Seed the database
 # ---------------------------------------------------------------------------
 echo ""
-echo "--- Step 6: Seeding Northwinds database ---"
-# Check if data already exists
+echo "--- Step 6: Seeding Pinnacle database ---"
+# Pinnacle uses per-process schemas (ap, billing, crm, gl, hr, performance,
+# planning, portfolio) instead of a flat public namespace. Count tables across
+# all non-system schemas to detect prior seeding (FR-042).
 ROW_COUNT=$(PGSSLMODE=require PGPASSWORD="$DB_PASSWORD" psql \
     -h "$DB_ENDPOINT" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" \
     -tAc \
-    "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE'" \
+    "SELECT count(*) FROM information_schema.tables WHERE table_type='BASE TABLE' AND table_schema NOT IN ('pg_catalog','information_schema') AND table_schema NOT LIKE 'pg_temp_%' AND table_schema NOT LIKE 'pg_toast%'" \
     2>/dev/null || echo "0")
 
-if [[ "$ROW_COUNT" -gt 5 ]]; then
-    echo "Database already seeded ($ROW_COUNT tables found). Skipping."
-else
-    echo "Loading seed data..."
+# Pinnacle has ~34 user tables across the 8 process schemas; threshold = 20
+# is well below that and well above any empty-DB control rows.
+if [[ "$ROW_COUNT" -gt 20 ]]; then
+    echo "Database already seeded ($ROW_COUNT tables found across business-process schemas). Skipping."
+elif [[ -f "$PROJECT_DIR/scripts/seed_pinnacle.sql" ]]; then
+    echo "Loading Pinnacle seed data..."
     PGSSLMODE=require PGPASSWORD="$DB_PASSWORD" psql \
         -h "$DB_ENDPOINT" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" \
-        -f "$PROJECT_DIR/scripts/seed_northwinds.sql" \
+        -f "$PROJECT_DIR/scripts/seed_pinnacle.sql" \
         > /dev/null 2>&1
-    echo "Northwinds data loaded."
+    echo "Pinnacle data loaded."
+else
+    echo "WARNING: scripts/seed_pinnacle.sql not found." >&2
+    echo "  The Pinnacle DB is expected to be already seeded out-of-band." >&2
+    echo "  To regenerate the seed file from a live DB, run:" >&2
+    echo "    scripts/regenerate_pinnacle_seed.sh" >&2
 fi
 
 else

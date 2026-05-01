@@ -18,6 +18,10 @@ dependencies = [
     "aiofiles>=24.1",
     "pydantic>=2.9",
     "python-jose[cryptography]>=3.3",  # Cognito JWT verification
+    "python-dotenv>=1.0",  # auto-load .env on FastAPI startup
+    # 002-dsa-hub-pinnacle: cross-source scratchpad + Iceberg/Glue driver
+    "duckdb>=1.1",
+    "pyiceberg[glue]>=0.7",
 ]
 
 [project.optional-dependencies]
@@ -31,6 +35,9 @@ redshift = [
 snowflake = [
     "snowflake-connector-python>=3.0",
     "dbt-snowflake>=1.9",
+]
+iceberg = [
+    "dbt-glue>=1.9",
 ]
 databricks = [
     "databricks-sql-connector>=3.0",
@@ -86,6 +93,10 @@ module = [
     "platform_agent.api.*",
     "platform_agent.workflow.*",
     "platform_agent.session.*",
+    # 002-dsa-hub-pinnacle: new modules added under strict-mode gating
+    "platform_agent.workspace.*",
+    "platform_agent.provisioning.*",
+    "platform_agent.semantic.*",
 ]
 disallow_untyped_defs = true
 disallow_incomplete_defs = true

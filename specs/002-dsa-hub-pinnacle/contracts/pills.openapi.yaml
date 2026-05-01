@@ -1,0 +1,153 @@
+openapi: 3.0.3
+info:
+  title: DSA Hub — Pilled PRD Generation
+  version: "1.0.0"
+  description: |
+    Schema-grounded pill generation (research R5). The pill-agent runs against
+    the workspace's discovery + coverage results and returns ≥6 schema-driven
+    pill suggestions. Clicking one returns a pre-drafted PRD.
+
+paths:
+  /workflow/pills:
+    post:
+      summary: Generate pilled PRD suggestions for the workspace.
+      parameters:
+        - $ref: "./workspace.openapi.yaml#/components/parameters/SessionHeader"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                force:
+                  type: boolean
+                  default: false
+                  description: Re-run the pill agent even if a cached set exists for this workspace's coverage hash.
+                min_pills:
+                  type: integer
+                  default: 6
+                  minimum: 3
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pills:
+                    type: array
+                    items: { $ref: "#/components/schemas/PillSuggestion" }
+                  generation_ms: { type: integer }
+                required: [pills]
+
+  /workflow/pills/{pill_id}/draft-prd:
+    post:
+      summary: Convert a pill into a pre-drafted PRD; returns the draft.
+      parameters:
+        - $ref: "./workspace.openapi.yaml#/components/parameters/SessionHeader"
+        - in: path
+          name: pill_id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PRDDraft" }
+        "404":
+          description: Pill not found in this workspace.
+
+components:
+  schemas:
+    PillSuggestion:
+      type: object
+      required: [pill_id, title, target_iceberg_table, source_connection_ids, seed_prd_body]
+      properties:
+        pill_id: { type: string }
+        title: { type: string }
+        subtitle: { type: string, description: "e.g., 'combines: Postgres + Snowflake'" }
+        icon: { type: string, description: "Lucide icon name." }
+        target_iceberg_table:
+          type: string
+          pattern: "^iceberg\\.[A-Za-z0-9_]+\\.[A-Za-z0-9_]+$"
+        source_connection_ids:
+          type: array
+          items: { type: string }
+          minItems: 1
+        estimated_build_minutes: { type: integer, minimum: 1 }
+        seed_prd_body: { $ref: "#/components/schemas/PRDDraft" }
+        generated_at: { type: string, format: date-time }
+        flags:
+          type: object
+          properties:
+            demo: { type: boolean, description: "True for canned demo-mode pills (FR-041)." }
+
+    PRDDraft:
+      type: object
+      required: [title, target, business_questions, source_pulls, standards_applied]
+      properties:
+        prd_id: { type: string, nullable: true }
+        title: { type: string }
+        target:
+          type: object
+          required: [connection_id, glue_db, table_name]
+          properties:
+            connection_id: { type: string }
+            glue_db: { type: string }
+            table_name: { type: string }
+        entities_proposed:
+          type: array
+          items:
+            type: object
+            properties:
+              name: { type: string }
+              attributes:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    name: { type: string }
+                    data_type: { type: string }
+                    is_pii: { type: boolean }
+        metrics_proposed:
+          type: array
+          items:
+            type: object
+            properties:
+              name: { type: string }
+              definition_sql: { type: string, format: sql }
+              unit: { type: string, nullable: true }
+        joins_identified:
+          type: array
+          items:
+            type: object
+            properties:
+              left_fqn: { type: string }
+              right_fqn: { type: string }
+              keys:
+                type: array
+                items:
+                  type: array
+                  items: { type: string }
+                  minItems: 2
+                  maxItems: 2
+              cardinality: { type: string, enum: [one_to_one, one_to_many, many_to_many] }
+        business_questions:
+          type: array
+          items: { type: string }
+          minItems: 1
+        source_pulls:
+          type: array
+          items:
+            type: object
+            required: [connection_id, sql]
+            properties:
+              connection_id: { type: string }
+              sql: { type: string, format: sql, description: "SELECT/WITH only; ≤250 rows." }
+              max_rows: { type: integer, default: 250, maximum: 250 }
+        standards_applied:
+          type: array
+          items: { type: string }
+          minItems: 1
+        origin: { type: string, enum: [pill, manual] }

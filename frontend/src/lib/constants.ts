@@ -191,7 +191,7 @@ export const FLAG_CONFIG: Record<string, { color: string; label: string }> = {
 
 export const DEMO_PRODUCT = {
   id: "dp-romi-001",
-  name: "ROMI Data Product",
+  name: "New Data Product",
   owner: "Jennifer Moss",
   owner_title: "VP Marketing Operations",
 } as const;

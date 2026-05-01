@@ -1,0 +1,124 @@
+openapi: 3.0.3
+info:
+  title: DSA Hub — Semantic Graph (Read-Only)
+  version: "1.0.0"
+  description: |
+    Per-connection semantic graph reads (Q2). The UI's `/semantic` page calls
+    these endpoints with a `connection_id` to render that connection's graph.
+    Writes happen exclusively through the provisioning flow's semantic-agent;
+    no public write endpoint exists in v1 (FR-025).
+
+paths:
+  /semantic/graph:
+    get:
+      summary: Fetch a per-connection semantic graph snapshot.
+      parameters:
+        - $ref: "./workspace.openapi.yaml#/components/parameters/SessionHeader"
+        - in: query
+          name: connection_id
+          required: true
+          schema: { type: string }
+        - in: query
+          name: domain
+          required: false
+          schema:
+            type: string
+            enum: [wealth_mgmt, accounting, crm, hr, planning, unspecified]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SemanticGraph" }
+        "404":
+          description: connection_id not found OR no store yet for this connection.
+
+  /semantic/entities/{entity_id}:
+    get:
+      summary: Detail view of a single entity (attributes, metrics, bindings).
+      parameters:
+        - $ref: "./workspace.openapi.yaml#/components/parameters/SessionHeader"
+        - in: path
+          name: entity_id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SemanticEntityDetail" }
+        "404": { description: not found }
+
+components:
+  schemas:
+    SemanticGraph:
+      type: object
+      required: [connection_id, entities, joins, kpi_strip]
+      properties:
+        connection_id: { type: string }
+        entities:
+          type: array
+          items:
+            type: object
+            properties:
+              entity_id: { type: string }
+              name: { type: string }
+              domain: { type: string }
+              metric_count: { type: integer }
+              binding_count: { type: integer }
+              version: { type: integer }
+        joins:
+          type: array
+          items:
+            type: object
+            properties:
+              join_id: { type: string }
+              left_entity_id: { type: string }
+              right_entity_id: { type: string }
+              cardinality: { type: string, enum: [one_to_one, one_to_many, many_to_many] }
+        kpi_strip:
+          type: object
+          properties:
+            entities: { type: integer }
+            metrics: { type: integer }
+            joins: { type: integer }
+            bindings: { type: integer }
+            processes_mapped_pct: { type: number, minimum: 0, maximum: 100 }
+
+    SemanticEntityDetail:
+      type: object
+      properties:
+        entity_id: { type: string }
+        connection_id: { type: string }
+        name: { type: string }
+        domain: { type: string }
+        attributes:
+          type: array
+          items:
+            type: object
+            properties:
+              name: { type: string }
+              data_type: { type: string }
+              is_pii: { type: boolean }
+              description: { type: string, nullable: true }
+        metrics:
+          type: array
+          items:
+            type: object
+            properties:
+              metric_id: { type: string }
+              name: { type: string }
+              definition_sql: { type: string }
+              unit: { type: string, nullable: true }
+        physical_bindings:
+          type: array
+          items:
+            type: object
+            properties:
+              binding_id: { type: string }
+              fully_qualified_name: { type: string }
+              column_map: { type: object, additionalProperties: { type: string } }
+              row_count_estimate: { type: integer, nullable: true }
+        version: { type: integer }
+        created_by_run_id: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }

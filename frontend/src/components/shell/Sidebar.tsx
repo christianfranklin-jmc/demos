@@ -5,8 +5,66 @@ import { DATA_PRODUCTS, type DataProduct } from "../../data/mock/data-products";
 import type { StepNumber, StepStatus } from "../../lib/types";
 import ConnectionForm from "./ConnectionForm";
 
+type ShellView =
+  | "workflow"
+  | "connections"
+  | "discovery"
+  | "build"
+  | "semantic"
+  | "standards";
+
 interface SidebarProps {
   onSettingsOpen: () => void;
+  view?: ShellView;
+  onViewChange?: (view: ShellView) => void;
+}
+
+interface SidebarNavItemProps {
+  icon: string;
+  label: string;
+  badge?: string;
+  isActive: boolean;
+  onClick: () => void;
+  theme: any;
+}
+
+function SidebarNavItem({
+  icon,
+  label,
+  badge,
+  isActive,
+  onClick,
+  theme,
+}: SidebarNavItemProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex items-center gap-2 px-2 py-1.5 text-sm w-full text-left"
+      style={{
+        backgroundColor: isActive ? theme.colors.surfaceActiveNav : "transparent",
+        borderRadius: `${theme.layout.borderRadius.nav}px`,
+        color: theme.colors.textPrimary,
+        fontWeight: isActive
+          ? theme.typography.mediumWeight
+          : theme.typography.bodyWeight,
+      }}
+    >
+      <span aria-hidden>{icon}</span>
+      <span className="flex-1 truncate">{label}</span>
+      {badge ? (
+        <span
+          className="text-[10px] px-1.5 py-0.5 rounded-full"
+          style={{
+            backgroundColor: theme.colors.accent,
+            color: theme.colors.btnPrimaryText ?? theme.colors.white,
+          }}
+        >
+          {badge}
+        </span>
+      ) : null}
+    </button>
+  );
 }
 
 function StepIndicator({ status, isActive, theme }: { status: StepStatus; isActive: boolean; theme: any }) {
@@ -34,6 +92,31 @@ function StepIndicator({ status, isActive, theme }: { status: StepStatus; isActi
   );
 }
 
+// Short page-level descriptions shown in the sidebar for the current step.
+// Kept tight (~2 sentences each) so the connection form stays visible below.
+const STEP_DESCRIPTIONS: Record<number, { title: string; body: string }> = {
+  0: {
+    title: "Stakeholders",
+    body: "Capture who needs the data product and why. The trigger email and target consumers are recorded here before requirements work begins.",
+  },
+  1: {
+    title: "Requirements",
+    body: "Connect a source, then describe what you want to understand. The agent scans the live schema and drafts a PRD grounded in the real tables and discovered business processes.",
+  },
+  2: {
+    title: "Conceptual Model",
+    body: "Entities and relationships derived from the live foreign-key graph. Review the proposed shape, then approve to move on.",
+  },
+  3: {
+    title: "Logical Model",
+    body: "Typed tables with sample values pulled live from each column. Verify the data types and samples before approving.",
+  },
+  4: {
+    title: "Detailed Requirements",
+    body: "A compilable dbt project plus a semantic layer, packaged as a downloadable zip you can run against the source.",
+  },
+};
+
 function ProductStatusDot({ product, theme }: { product: DataProduct; theme: any }) {
   const color =
     product.overallStatus === "complete"
@@ -52,10 +135,17 @@ function ProductStatusDot({ product, theme }: { product: DataProduct; theme: any
   );
 }
 
-export default function Sidebar({ onSettingsOpen }: SidebarProps) {
+export default function Sidebar({
+  onSettingsOpen,
+  view = "workflow",
+  onViewChange,
+}: SidebarProps) {
   const { state, dispatch } = useAppState();
   const { theme } = useTheme();
   const [selectedProductId, setSelectedProductId] = useState(state.lifecycle.data_product_id);
+  const liveConnections = state.workspaceConnections.filter(
+    (c) => c.status === "live"
+  ).length;
 
   const stepLabels: Record<number, string> = {
     0: theme.steps.step0Label,
@@ -83,7 +173,12 @@ export default function Sidebar({ onSettingsOpen }: SidebarProps) {
 
   return (
     <aside
-      className="flex flex-col border-r shrink-0 h-full"
+      // 002-dsa-hub-pinnacle: overflow-y-auto so the bottom-anchored
+      // ConnectionForm + Settings trigger remain reachable when the new
+      // top-level nav items push the natural content height past the
+      // viewport. Without this the connect button is clipped on shorter
+      // screens.
+      className="flex flex-col border-r shrink-0 h-full overflow-y-auto"
       style={{
         width: `${theme.layout.sidebarWidth}px`,
         minWidth: `${theme.layout.sidebarWidth}px`,
@@ -100,6 +195,55 @@ export default function Sidebar({ onSettingsOpen }: SidebarProps) {
           {theme.brand.platformName}
         </span>
       </div>
+
+      {/* 002-dsa-hub-pinnacle US1+US2 — top-level view toggle */}
+      {onViewChange ? (
+        <div className="px-3 pb-2 flex flex-col gap-0.5">
+          <SidebarNavItem
+            icon="📐"
+            label="Workflow"
+            isActive={view === "workflow"}
+            onClick={() => onViewChange("workflow")}
+            theme={theme}
+          />
+          <SidebarNavItem
+            icon="🌐"
+            label="Connections"
+            badge={liveConnections > 0 ? String(liveConnections) : undefined}
+            isActive={view === "connections"}
+            onClick={() => onViewChange("connections")}
+            theme={theme}
+          />
+          <SidebarNavItem
+            icon="🧭"
+            label="Discovery"
+            isActive={view === "discovery"}
+            onClick={() => onViewChange("discovery")}
+            theme={theme}
+          />
+          <SidebarNavItem
+            icon="🛠"
+            label="Build"
+            isActive={view === "build"}
+            onClick={() => onViewChange("build")}
+            theme={theme}
+          />
+          <SidebarNavItem
+            icon="🕸"
+            label="Semantic"
+            isActive={view === "semantic"}
+            onClick={() => onViewChange("semantic")}
+            theme={theme}
+          />
+          <SidebarNavItem
+            icon="📚"
+            label="Standards"
+            isActive={view === "standards"}
+            onClick={() => onViewChange("standards")}
+            theme={theme}
+          />
+        </div>
+      ) : null}
 
       {/* Extra nav items */}
       {theme.sidebar.navItems.map((item: any, i: number) => (
@@ -122,10 +266,9 @@ export default function Sidebar({ onSettingsOpen }: SidebarProps) {
           {theme.sidebar.workflowFolderLabel}
         </p>
 
-        {/* Active data product only — the static demo cohort
-            (Customer Churn / Revenue Attribution / etc.) is replaced by the
-            "How this works" explainer below to keep the sidebar focused on
-            the live workflow. */}
+        {/* Active data product only — the unused mock cohort (Customer Churn,
+            Revenue Attribution, Customer Lifetime Value, Sales Pipeline Health)
+            is replaced by a per-step description card below. */}
         {DATA_PRODUCTS.filter((p) => p.id === "dp-romi-001").map((product) => (
           <div key={product.id}>
             <button
@@ -201,66 +344,36 @@ export default function Sidebar({ onSettingsOpen }: SidebarProps) {
           </div>
         ))}
 
-        {/* "How this works" explainer — replaces the static demo product
-            cohort. Two short sections: the 4-step PRD flow and Talk to Data. */}
-        <div
-          className="mt-3 mx-1 px-3 py-3 rounded text-xs leading-relaxed"
-          style={{
-            background: theme.colors.surfaceInput,
-            border: `1px solid ${theme.colors.borderSubtle}`,
-            color: theme.colors.textPrimary,
-          }}
-        >
-          <p
-            className="text-[11px] uppercase tracking-wider mb-2"
-            style={{ color: theme.colors.textTertiary }}
-          >
-            How this works
-          </p>
-
-          <p
-            className="font-semibold mb-1"
-            style={{ color: theme.colors.textPrimary }}
-          >
-            Build a PRD in 4 steps
-          </p>
-          <ol
-            className="list-decimal pl-4 mb-3 space-y-1"
-            style={{ color: theme.colors.textSecondary }}
-          >
-            <li>
-              <span style={{ color: theme.colors.textPrimary }}>Requirements</span> — the
-              agent scans the connected source and drafts a PRD grounded in the real
-              tables and discovered business processes.
-            </li>
-            <li>
-              <span style={{ color: theme.colors.textPrimary }}>Conceptual model</span> —
-              entities and relationships derived from the live foreign-key graph.
-            </li>
-            <li>
-              <span style={{ color: theme.colors.textPrimary }}>Logical model</span> —
-              typed tables with sample values pulled live from each column.
-            </li>
-            <li>
-              <span style={{ color: theme.colors.textPrimary }}>Detailed requirements</span> —
-              a downloadable dbt project + semantic layer.
-            </li>
-          </ol>
-
-          <p
-            className="font-semibold mb-1"
-            style={{ color: theme.colors.textPrimary }}
-          >
-            Talk to your data
-          </p>
-          <p style={{ color: theme.colors.textSecondary }}>
-            Once a PRD field is filled, the artifact panel exposes a{" "}
-            <span style={{ color: theme.colors.textPrimary }}>Talk to Data</span> tab. Ask
-            plain-English questions; the agent writes SELECT queries against the
-            connected source, joins across tables as needed, and returns the rows
-            alongside the SQL it ran.
-          </p>
-        </div>
+        {/* Per-step description — replaces the unused mock data products
+            (Customer Churn / Revenue Attribution / etc.) with a brief,
+            context-aware blurb about what the current step does. */}
+        {(() => {
+          const desc = STEP_DESCRIPTIONS[state.lifecycle.current_step];
+          if (!desc) return null;
+          return (
+            <div
+              className="mt-3 mx-1 px-3 py-2.5 rounded text-xs leading-snug"
+              style={{
+                background: theme.colors.surfaceInput,
+                border: `1px solid ${theme.colors.borderSubtle}`,
+              }}
+            >
+              <p
+                className="text-[10px] uppercase tracking-wider mb-1"
+                style={{ color: theme.colors.textTertiary }}
+              >
+                About this step
+              </p>
+              <p
+                className="font-semibold mb-1"
+                style={{ color: theme.colors.textPrimary }}
+              >
+                {desc.title}
+              </p>
+              <p style={{ color: theme.colors.textSecondary }}>{desc.body}</p>
+            </div>
+          );
+        })()}
       </nav>
 
       {/* 001-dsa-agent-integration: source-database connection form. */}

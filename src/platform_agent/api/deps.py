@@ -133,21 +133,34 @@ def _verify_jwt(token: str) -> dict[str, Any]:
 async def get_session_context(
     request: Request,
     x_dsa_session_id: Annotated[str | None, Header(alias="X-DSA-Session-ID")] = None,
+    x_dsa_workspace_id: Annotated[str | None, Header(alias="X-DSA-Workspace-ID")] = None,
     authorization: Annotated[str | None, Header()] = None,
 ) -> SessionContext:
     """Extract a :class:`SessionContext` from request headers.
 
-    - Missing or malformed ``X-DSA-Session-ID`` → 400.
+    - ``X-DSA-Session-ID`` is the canonical header. ``X-DSA-Workspace-ID`` is
+      accepted as a synonym for one minor version (002-dsa-hub-pinnacle FR-006);
+      a deprecation warning is logged when only the alias is supplied.
+    - Missing or malformed id → 400.
     - In deployed mode, missing ``Authorization`` → 401.
     - In deployed mode, JWT is verified against Cognito JWKS. In local mode,
       if an Authorization header is present we best-effort parse its claims
       without signature verification (useful for dev-server Cognito mocks).
     """
     _ = request  # reserved for future rate-limit hooks
-    if not x_dsa_session_id:
-        raise HTTPException(status_code=400, detail="Missing X-DSA-Session-ID header")
+    raw_id = x_dsa_session_id or x_dsa_workspace_id
+    if not raw_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Missing X-DSA-Session-ID header (or X-DSA-Workspace-ID alias)",
+        )
+    if x_dsa_session_id is None and x_dsa_workspace_id is not None:
+        logger.warning(
+            "X-DSA-Workspace-ID is a back-compat alias for X-DSA-Session-ID; "
+            "callers should migrate to X-DSA-Session-ID."
+        )
     try:
-        session_id = UUID(x_dsa_session_id)
+        session_id = UUID(raw_id)
     except ValueError as exc:
         raise HTTPException(
             status_code=400, detail="X-DSA-Session-ID is not a valid UUID"

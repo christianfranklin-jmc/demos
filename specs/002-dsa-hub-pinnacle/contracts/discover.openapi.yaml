@@ -1,0 +1,127 @@
+openapi: 3.0.3
+info:
+  title: DSA Hub — Multi-Source Discovery
+  version: "1.0.0"
+  description: |
+    Extends the existing `POST /workflow/discover` (which today runs per source)
+    with workspace-scoped semantics: discover is invoked per connection AND
+    rolled up at the workspace level, producing the per-process cards and the
+    cross-source coverage matrix consumed by Step 1 (Stories US-2).
+
+paths:
+  /workflow/discover:
+    post:
+      summary: Run discovery — per-connection or workspace-wide.
+      parameters:
+        - $ref: "./workspace.openapi.yaml#/components/parameters/SessionHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: "#/components/schemas/PerConnectionDiscoverRequest"
+                - $ref: "#/components/schemas/WorkspaceDiscoverRequest"
+      responses:
+        "200":
+          description: |
+            Per-connection request → returns processes + discovery cache snapshot
+            for that connection. Workspace request → returns the merged
+            CoverageMatrix and the cached per-connection process lists.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/PerConnectionDiscoverResponse"
+                  - $ref: "#/components/schemas/WorkspaceDiscoverResponse"
+
+components:
+  schemas:
+    PerConnectionDiscoverRequest:
+      type: object
+      required: [scope, connection_id]
+      properties:
+        scope: { type: string, enum: [connection] }
+        connection_id: { type: string }
+        force: { type: boolean, default: false, description: "Bypass cache." }
+
+    WorkspaceDiscoverRequest:
+      type: object
+      required: [scope]
+      properties:
+        scope: { type: string, enum: [workspace] }
+        force: { type: boolean, default: false }
+
+    PerConnectionDiscoverResponse:
+      type: object
+      required: [connection_id, processes, kpi_summary]
+      properties:
+        connection_id: { type: string }
+        processes:
+          type: array
+          items: { $ref: "#/components/schemas/BusinessProcess" }
+        kpi_summary:
+          type: object
+          properties:
+            tables_scanned: { type: integer }
+            columns_profiled: { type: integer }
+            processes_detected: { type: integer }
+            elapsed_ms: { type: integer }
+
+    WorkspaceDiscoverResponse:
+      type: object
+      required: [coverage_matrix, per_connection]
+      properties:
+        coverage_matrix: { $ref: "#/components/schemas/CoverageMatrix" }
+        per_connection:
+          type: array
+          items: { $ref: "#/components/schemas/PerConnectionDiscoverResponse" }
+        cross_source_links_found: { type: integer }
+
+    BusinessProcess:
+      type: object
+      required: [process_id, name, domain, volume_signal, backing_tables]
+      properties:
+        process_id: { type: string }
+        name: { type: string }
+        domain:
+          type: string
+          enum: [wealth_mgmt, accounting, crm, hr, planning, unspecified]
+        volume_signal:
+          type: object
+          properties:
+            row_count: { type: integer }
+            dollar_total: { type: string, nullable: true, description: "Decimal as string to avoid float drift." }
+            currency: { type: string, nullable: true }
+        last_activity_ts: { type: string, format: date-time, nullable: true }
+        sparkline:
+          type: array
+          items: { type: number }
+          minItems: 12
+          maxItems: 12
+        backing_tables:
+          type: array
+          items: { type: string }
+
+    CoverageMatrix:
+      type: object
+      required: [matrix_id, rows]
+      properties:
+        matrix_id: { type: string }
+        rows:
+          type: array
+          items:
+            type: object
+            properties:
+              process_name: { type: string }
+              per_connection:
+                type: object
+                additionalProperties:
+                  type: object
+                  properties:
+                    present: { type: boolean }
+                    backing_tables: { type: array, items: { type: string } }
+              shared_keys:
+                type: array
+                items: { type: string }
+              ready_to_combine: { type: boolean }

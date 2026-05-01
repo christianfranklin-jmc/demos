@@ -110,42 +110,101 @@ class PostgreSQLDriver:
         cur.close()
         return {"status": "success", "statement": sql[:200]}
 
-    def scan_metadata(self) -> dict:
-        """Scan metadata via information_schema + pg_stat_user_tables."""
+    # Schemas that are never user-content; excluded from auto-discovery
+    # (002-dsa-hub-pinnacle US2 — multi-schema scan_metadata).
+    _SYSTEM_SCHEMA_PREFIXES = ("pg_", "information_schema")
+    _SCHEMA_DENYLIST = frozenset({"public_staging"})
+
+    def _resolve_schemas(self, schemas: list[str] | None) -> list[str]:
+        """Return the list of schemas to scan.
+
+        ``schemas=None`` → auto-discover every non-system schema (Pinnacle's
+        per-process layout). Pass an explicit list to constrain (e.g.,
+        ``["public"]`` to preserve the pre-002 single-schema behavior).
+        """
+        if schemas is not None:
+            return list(schemas)
+        conn = self._get_conn()
+        cur = conn.cursor()
+        cur.execute("SELECT schema_name FROM information_schema.schemata")
+        all_schemas = [r[0] for r in cur.fetchall()]
+        cur.close()
+        return [
+            s
+            for s in all_schemas
+            if not s.startswith(self._SYSTEM_SCHEMA_PREFIXES)
+            and s not in self._SCHEMA_DENYLIST
+        ]
+
+    def scan_metadata(self, schemas: list[str] | None = None) -> dict:
+        """Scan metadata via information_schema + pg_stat_user_tables.
+
+        ``schemas`` controls which schemas are scanned. ``None`` (default)
+        auto-discovers every non-system schema, supporting Pinnacle's per-
+        process layout (ap/billing/crm/gl/hr/performance/planning/portfolio).
+        Pass ``["public"]`` to restore single-schema behavior.
+
+        Each returned table now carries a ``schema`` field so downstream
+        consumers can disambiguate (e.g., ``pinnacle.ap.ap_invoice``).
+        """
         conn = self._get_conn()
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        target_schemas = self._resolve_schemas(schemas)
+        if not target_schemas:
+            cur.close()
+            return {
+                "source_id": f"{self.driver_type}_{self.database}",
+                "service": self.driver_type,
+                "database": self.database,
+                "schemas": [],
+                "tables": [],
+            }
 
-        cur.execute("""
-            SELECT table_schema, table_name, table_type
+        cur.execute(
+            """
+            SELECT table_schema, table_name
             FROM information_schema.tables
-            WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
-            ORDER BY table_name
-        """)
+            WHERE table_type = 'BASE TABLE' AND table_schema = ANY(%s)
+            ORDER BY table_schema, table_name
+            """,
+            (target_schemas,),
+        )
         tables = cur.fetchall()
 
-        cur.execute("""
-            SELECT table_name, column_name, ordinal_position, data_type,
+        cur.execute(
+            """
+            SELECT table_schema, table_name, column_name, ordinal_position, data_type,
                    character_maximum_length, numeric_precision, is_nullable, column_default
             FROM information_schema.columns
-            WHERE table_schema = 'public'
-            ORDER BY table_name, ordinal_position
-        """)
+            WHERE table_schema = ANY(%s)
+            ORDER BY table_schema, table_name, ordinal_position
+            """,
+            (target_schemas,),
+        )
         columns = cur.fetchall()
 
-        cur.execute("""
-            SELECT tc.table_name, kcu.column_name
+        cur.execute(
+            """
+            SELECT tc.table_schema, tc.table_name, kcu.column_name
             FROM information_schema.table_constraints tc
             JOIN information_schema.key_column_usage kcu
                 ON tc.constraint_name = kcu.constraint_name
                 AND tc.table_schema = kcu.table_schema
-            WHERE tc.constraint_type = 'PRIMARY KEY' AND tc.table_schema = 'public'
-            ORDER BY tc.table_name, kcu.ordinal_position
-        """)
+            WHERE tc.constraint_type = 'PRIMARY KEY' AND tc.table_schema = ANY(%s)
+            ORDER BY tc.table_schema, tc.table_name, kcu.ordinal_position
+            """,
+            (target_schemas,),
+        )
         pks = cur.fetchall()
 
-        cur.execute("""
-            SELECT tc.table_name AS source_table, kcu.column_name AS source_column,
-                   ccu.table_name AS target_table, ccu.column_name AS target_column
+        cur.execute(
+            """
+            SELECT tc.table_schema AS source_schema,
+                   tc.table_name AS source_table,
+                   kcu.column_name AS source_column,
+                   ccu.table_schema AS target_schema,
+                   ccu.table_name AS target_table,
+                   ccu.column_name AS target_column
             FROM information_schema.table_constraints tc
             JOIN information_schema.key_column_usage kcu
                 ON tc.constraint_name = kcu.constraint_name
@@ -153,47 +212,71 @@ class PostgreSQLDriver:
             JOIN information_schema.constraint_column_usage ccu
                 ON tc.constraint_name = ccu.constraint_name
                 AND tc.table_schema = ccu.table_schema
-            WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_schema = 'public'
-        """)
+            WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_schema = ANY(%s)
+            """,
+            (target_schemas,),
+        )
         fks = cur.fetchall()
 
-        cur.execute("""
-            SELECT relname AS table_name, n_live_tup AS row_count
-            FROM pg_stat_user_tables WHERE schemaname = 'public'
-        """)
+        cur.execute(
+            """
+            SELECT schemaname, relname AS table_name, n_live_tup AS row_count
+            FROM pg_stat_user_tables WHERE schemaname = ANY(%s)
+            """,
+            (target_schemas,),
+        )
         row_counts = cur.fetchall()
         cur.close()
 
+        # Index everything by (schema, table_name).
+        def key(s: str, t: str) -> str:
+            return f"{s}.{t}"
+
         columns_by_table: dict[str, list] = {}
         for col in columns:
-            columns_by_table.setdefault(col["table_name"], []).append(dict(col))
+            columns_by_table.setdefault(
+                key(col["table_schema"], col["table_name"]), []
+            ).append(dict(col))
 
         pks_by_table: dict[str, list] = {}
         for pk in pks:
-            pks_by_table.setdefault(pk["table_name"], []).append(pk["column_name"])
+            pks_by_table.setdefault(
+                key(pk["table_schema"], pk["table_name"]), []
+            ).append(pk["column_name"])
 
         fks_list = [dict(fk) for fk in fks]
-        counts = {rc["table_name"]: rc["row_count"] for rc in row_counts}
+        counts: dict[str, int] = {}
+        for rc in row_counts:
+            counts[key(rc["schemaname"], rc["table_name"])] = rc["row_count"]
 
-        result = {
+        result_tables: list[dict] = []
+        for tbl in tables:
+            schema = tbl["table_schema"]
+            name = tbl["table_name"]
+            k = key(schema, name)
+            result_tables.append(
+                {
+                    "schema": schema,
+                    "table_name": name,
+                    "fully_qualified_name": f"{self.database}.{schema}.{name}",
+                    "columns": columns_by_table.get(k, []),
+                    "primary_key": pks_by_table.get(k, []),
+                    "foreign_keys": [
+                        fk
+                        for fk in fks_list
+                        if fk["source_schema"] == schema and fk["source_table"] == name
+                    ],
+                    "row_count": counts.get(k, 0),
+                }
+            )
+
+        return {
             "source_id": f"{self.driver_type}_{self.database}",
             "service": self.driver_type,
             "database": self.database,
-            "schema": "public",
-            "tables": [],
+            "schemas": target_schemas,
+            "tables": result_tables,
         }
-
-        for tbl in tables:
-            name = tbl["table_name"]
-            result["tables"].append({
-                "table_name": name,
-                "columns": columns_by_table.get(name, []),
-                "primary_key": pks_by_table.get(name, []),
-                "foreign_keys": [fk for fk in fks_list if fk["source_table"] == name],
-                "row_count": counts.get(name, 0),
-            })
-
-        return result
 
     def profile_columns(self) -> dict:
         """Profile columns — returns scan data (full profiling requires Toolkit CLI)."""

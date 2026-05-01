@@ -13,14 +13,30 @@ import logging
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+# Auto-load `.env` from the repo root so `uv run uvicorn …` picks up the
+# Pinnacle DB/SF credentials even when the operator forgot to `source .env`.
+# Existing process env wins (override=False) so deployed-mode injected vars
+# are never clobbered. Silent no-op if the file is missing.
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+load_dotenv(_REPO_ROOT / ".env", override=False)
 
 from .routes_discover import router as discover_router
 from .routes_health import router as health_router
 from .routes_query import router as query_router
+from .routes_query_cross_source import router as query_cross_source_router
+from .routes_redundancy import router as redundancy_router
+from .routes_semantic import router as semantic_router
+from .routes_standards import router as standards_router
 from .routes_workflow import router as workflow_router
+from .routes_workflow_provision import router as workflow_provision_router
+from .routes_workspace import router as workspace_router
+from .routes_workspace_discover import router as workspace_discover_router
 from .zip_stream import ArtifactStore
 
 logger = logging.getLogger(__name__)
@@ -58,14 +74,29 @@ def create_app() -> FastAPI:
         CORSMiddleware,
         allow_origins=_cors_origins(),
         allow_credentials=False,
-        allow_methods=["GET", "POST", "OPTIONS"],
-        allow_headers=["Content-Type", "Accept", "Authorization", "X-DSA-Session-ID"],
+        # DELETE added for /workspace/connection/{id} (002-dsa-hub-pinnacle US1).
+        allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+        allow_headers=[
+            "Content-Type",
+            "Accept",
+            "Authorization",
+            "X-DSA-Session-ID",
+            # 002-dsa-hub-pinnacle FR-006 — back-compat alias for one minor version.
+            "X-DSA-Workspace-ID",
+        ],
     )
 
     app.include_router(health_router)
     app.include_router(workflow_router)
     app.include_router(query_router)
     app.include_router(discover_router)
+    app.include_router(workspace_router)
+    app.include_router(workspace_discover_router)
+    app.include_router(workflow_provision_router)
+    app.include_router(query_cross_source_router)
+    app.include_router(semantic_router)
+    app.include_router(redundancy_router)
+    app.include_router(standards_router)
 
     return app
 

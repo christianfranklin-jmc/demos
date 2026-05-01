@@ -4,6 +4,10 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+# 002-dsa-hub-pinnacle US3 — explicitly track the Build-page React components
+# even though the bare `build/` pattern matches at any depth.
+!frontend/src/components/build/
+!frontend/src/components/build/**
 .venv/
 venv/
 

@@ -147,7 +147,9 @@ streamlit_app/app.py              # Streamlit TTYD app (preserved as alternative
 scripts/
   bootstrap.sh                    # Provision RDS + Redshift Serverless + seed data + config files
   teardown.sh                     # Remove Redshift + RDS + AgentCore + terraform destroy
-  seed_northwinds.sql             # Northwinds DDL + 3362 INSERT statements
+  seed_pinnacle.sql               # Pinnacle Financial DDL + ~15k INSERT statements (8 process schemas — feature 002 FR-042)
+  seed_northwinds.sql             # Legacy Northwinds DDL — Redshift-only path; preserved for back-compat regression
+  regenerate_pinnacle_seed.sh     # pg_dump-based regeneration of seed_pinnacle.sql from a live RDS instance
 .env.example                      # Template for env vars (copy to .env)
 ```
 
@@ -233,18 +235,18 @@ The agent supports multiple database backends via the `DatabaseDriver` protocol 
 - **Account**: 637119802057
 - **Profile**: `AdministratorAccess-637119802057`
 - **Region**: us-east-1
-- **RDS**: Provisioned by `scripts/bootstrap.sh` — PostgreSQL 16.6, db.t3.micro, Northwinds dataset
-- **Redshift**: Provisioned by `scripts/bootstrap.sh` — Serverless, 8 base RPU, Northwinds dataset
+- **RDS**: Provisioned by `scripts/bootstrap.sh` — PostgreSQL 16.6, db.t3.micro, **Pinnacle Financial dataset** (8 business-process schemas: ap, billing, crm, gl, hr, performance, planning, portfolio; ~34 tables; replaces the prior Northwinds seed per feature 002 FR-042)
+- **Redshift**: Provisioned by `scripts/bootstrap.sh` — Serverless, 8 base RPU, Northwinds dataset (Redshift kept on Northwinds for back-compat regression — not in the v1 demo path for feature 002)
 - **Bedrock models**: us.anthropic.claude-sonnet-4, us.anthropic.claude-opus-4
 - **Snowflake**: Pinnacle Financial demo — account `lga76011`, database `PINNACLE_FINANCIAL_DEMO_ASINGH`, schema `ANALYTICS`, SSO via `externalbrowser`
 
 ### Bootstrap creates:
 - Security group (`platform-agent-rds-sg`, ports 5432 + 5439 open)
 - DB subnet group (`platform-agent-db-subnets`)
-- RDS instance (`platform-agent-northwinds`) — PostgreSQL 16.6, db.t3.micro
+- RDS instance (`platform-agent-pinnacle`) — PostgreSQL 16.6, db.t3.micro
 - Redshift Serverless namespace (`platform-agent-ns`) + workgroup (`platform-agent-wg`, 8 base RPU)
-- Seeds Northwinds into both PostgreSQL and Redshift (14 tables, 830 orders)
-- Generates `.env` with DB_* (PostgreSQL) and RS_* (Redshift) connection vars
+- Seeds Pinnacle into PostgreSQL (8 process schemas, ~34 tables, ~15k INSERT statements via `scripts/seed_pinnacle.sql`); seeds Northwinds into Redshift only
+- Generates `.env` with DB_* (PostgreSQL → Pinnacle) and RS_* (Redshift → Northwinds) connection vars
 
 ### Terraform creates (infra-terraform/):
 - Cognito User Pool + OAuth2 clients (web + machine)
@@ -279,6 +281,8 @@ Phases completed:
 - **Phase 7**: FAST template integration — Terraform infrastructure (3-module hierarchy), multi-database driver abstraction (PostgreSQL + Redshift), AgentCore Gateway (5 Lambda tools), AgentCore Memory (30-day retention), Observability (OTel auto-instrumentation → CloudWatch), Evaluation (on-demand + 10% online sampling), React frontend (Vite + TypeScript + agentcore-client SSE), Cognito auth (JWT + OAuth2 M2M), Docker Compose local dev. ADRs 008-011. Branch: `redshift-agentcore-dbt`.
 
 - **Phase 8**: Snow-Iceberg Migration — 5 autonomous agents for Snowflake → AWS migration via Apache Iceberg. SnowflakeDriver (SSO/externalbrowser + password auth), Migration Agent (extract_schema, convert_to_iceberg, validate_migration), Enrichment Agent (RAG + DataZone + semantic YAML), Quality Agent (DQDL + quarantine + dbt test), Mapping Agent (Neptune graph + dbt lineage), Query Agent (NL-to-SQL + semantic cache). dbt MCP server integration (40+ tools). Gateway Lambda extensions (snowflake_tools, iceberg_tools). Terraform modules for data services (S3, Glue, Neptune, ElastiCache), secrets, and events (EventBridge + Step Functions). ADRs 012-014. Branch: `snow-iceberg-migration`. Tested against Pinnacle Financial (PINNACLE_FINANCIAL_DEMO_ASINGH).
+
+- **Phase 9 (DSA Hub Pinnacle Cross-Source — feature 002, Phases 1–10 complete; merged to `main` 2026-04-30)**: Multi-source workspace hub. Six new top-level views (📐 Workflow / 🌐 Connections / 🧭 Discovery / 🛠 Build / 🕸 Semantic / 📚 Standards) layered on the existing single-source app via a `ShellView` toggle (no router). Per-tab `Workspace` + N `Connections` (Q1); per-connection durable `ConnectionStore` (SQLite local / DynamoDB deployed) (Q2); first-class `IcebergDriver` (Q3); multi-schema `PostgreSQLDriver.scan_metadata()`; workspace-scoped business-process discovery + 6 schema-grounded pilled PRDs (Pinnacle named pills + heuristic fallback for non-Pinnacle, SC-010); 7-agent provisioning DAG with SSE schema v2 + per-agent retry + 80%-threshold gate (Q5) for `final` vs `provisional` Iceberg products; cross-source TTYD via in-process DuckDB scratchpad with 250-row pull cap + 5,000-row join cap (FR-018); per-connection Semantic Graph page (React Flow); pre-acceptance Redundancy Gate; read-only Standards page. **Phase 10 promoted 5 of 7 agents from stubs to real paths**: `schema_agent` + `mapping_agent` (Iceberg/Glue write path, 10b), `pipeline_agent` (real source pulls + Parquet landing, 10c), `model_agent` + `semantic_agent` FK fix (10d). One-click Pinnacle connection presets (10e). Reliability fixes for Snowflake schema default + KPI summing + 0-table amber alert (10f). `query_agent` NL→SQL planner + `delivery_agent` LLM-as-judge swap remain on the deterministic v1 path per ADR-018 D2 / ADR-020 D5. ADRs 016-021 all Accepted; LLM swap paths reserved per ADR-018 D2 / 019 D2 / 021 D2. **144 pytest + 18 vitest tests; mypy strict + ruff clean on all new modules.** Branch (merged): `002-dsa-hub-pinnacle`. Deferred items consolidated in `specs/002-dsa-hub-pinnacle/tasks.md` § Deferred (post-merge).
 
 ## Snowflake → Iceberg Migration (5 Agents)
 
@@ -363,6 +367,9 @@ The FAST pattern uses `BedrockAgentCoreApp` with `@app.entrypoint`, replacing th
 ## Active Technologies
 - Python 3.12+ (backend, agents, Lambda tools); TypeScript 5.6 + React 18 (frontend) per Constitution Article II. (001-dsa-agent-integration)
 - Ephemeral only. (001-dsa-agent-integration)
+- Python 3.12+ (backend, agents, Lambda tools); TypeScript 5.6 + React 18 (frontend) per Constitution Article II. CLI text-mode equivalent for every UI surface (three-frontend rule from CLAUDE.md). (002-dsa-hub-pinnacle)
 
 ## Recent Changes
+
+- **002-dsa-hub-pinnacle (Phases 1–10 complete; merged to `main` 2026-04-30)** — multi-source workspace hub with per-tab `Workspace` (Q1) owning N `Connections`; per-connection durable `ConnectionStore` (SQLite local / DynamoDB deployed) holding semantic graph + Iceberg products + activity log (Q2); first-class `IcebergDriver` (Q3) for Glue Catalog; multi-schema `PostgreSQLDriver.scan_metadata()`; workspace-scoped business-process discovery + 6 schema-grounded pilled PRDs (Pinnacle named pills + heuristic fallback for non-Pinnacle); 7-agent provisioning DAG (`schema → pipeline → model → quality → mapping → {semantic, delivery}`) with SSE schema v2 + per-agent retry + validation threshold gate (Q5); cross-source TTYD via in-process DuckDB scratchpad with 250-row pull cap + 5,000-row join cap (FR-018); per-connection Semantic Graph page (React Flow); pre-acceptance Redundancy Gate; read-only Standards page. Six new top-level views in AppShell (📐 Workflow / 🌐 Connections / 🧭 Discovery / 🛠 Build / 🕸 Semantic / 📚 Standards) with no router — driven by a `ShellView` toggle. Phase 10 promoted 5 of 7 provisioning agents from stubs to real paths (`schema/mapping` Iceberg writes, `pipeline` source pulls + Parquet, `model` dbt writes, `semantic` FK ordering); one-click Pinnacle connection presets; Snowflake schema/KPI/0-table reliability fixes. Six new ADRs (016-021) — all Accepted. 144 pytest + 18 vitest tests. Strands LLM swap-paths reserved per ADR-018 D2 / 019 D2 / 020 D5 / 021 D2. Deferred items in `specs/002-dsa-hub-pinnacle/tasks.md` § Deferred (post-merge).
 - 001-dsa-agent-integration: Added Python 3.12+ (backend, agents, Lambda tools); TypeScript 5.6 + React 18 (frontend) per Constitution Article II.

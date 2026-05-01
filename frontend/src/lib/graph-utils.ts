@@ -15,7 +15,7 @@ import { ENTITY_COLORS } from "./constants";
 
 export function buildSourceGraph(
   prd: PRDArtifact,
-  productName: string = "ROMI Data Product",
+  productName: string = "New Data Product",
 ): { nodes: Node[]; edges: Edge[] } {
   const nodes: Node[] = [];
   const edges: Edge[] = [];
