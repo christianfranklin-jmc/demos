@@ -25,6 +25,7 @@ import type {
   SSEEventV1,
   StepId,
   StepRequest,
+  DashboardRequest,
   ConversationMessage,
   PrdPayload,
   ConceptualModelPayload,
@@ -125,26 +126,27 @@ export function useAgent(): void {
 
     lastSentIndexRef.current = idx;
 
-    const stepId = STEP_NUMBER_TO_ID[message.step];
-    if (!stepId) return; // step 0 (stakeholders) is out of scope for the backend
-
-    // Fire-and-track the backend call. We do not await — this is an effect.
-    // Pull domain from the discovery payload — first business process name
-    // is the most representative label (e.g. "Order Management" for
-    // Northwinds, "Client Portfolio Analytics" for Pinnacle). Falls back to
-    // the domain summary, then a generic label.
     const dataDomain =
       state.sourceContext?.businessProcesses?.[0]?.name ||
       state.sourceContext?.domainSummary ||
       null;
-    inFlightRef.current = runStep(stepId, message.message_text, {
+    const ctx: RunStepContext = {
       sessionId: state.sessionId,
       connection: state.connection,
       dispatch,
       currentStep: message.step,
       driverType: state.connection?.driver_type ?? null,
       dataDomain,
-    });
+    };
+
+    // Dashboard mode: user attached an image — route to /workflow/dashboard
+    if (message.image_data && state.connection) {
+      inFlightRef.current = runDashboard(message.image_data, message.message_text, ctx);
+    } else {
+      const stepId = STEP_NUMBER_TO_ID[message.step];
+      if (!stepId) return; // step 0 (stakeholders) is out of scope for the backend
+      inFlightRef.current = runStep(stepId, message.message_text, ctx);
+    }
     currentController = inFlightRef.current;
 
     return () => {
@@ -261,6 +263,109 @@ export function runStep(
           step: ctx.currentStep,
           message_role: "agent",
           message_text: `⚠️ Backend call failed: ${message}. Check the connection details, then retry. Toggle "Demo mode" if you'd like to use the pre-scripted flow.`,
+          timestamp: new Date().toISOString(),
+        } as any,
+      });
+    } finally {
+      silence?.dispose();
+      ctx.dispatch({ type: "SET_AGENT_THINKING", thinking: false });
+    }
+  })();
+
+  return controller;
+}
+
+/**
+ * Invoke `POST /workflow/dashboard` with a screenshot data URL and stream the
+ * SSE response. Reuses the same handleEvent dispatcher as runStep.
+ */
+export function runDashboard(
+  imageData: string,
+  userMessage: string,
+  ctx: RunStepContext,
+): RunStepController {
+  const abortCtl = new AbortController();
+  const controller: RunStepController = {
+    abort: () => abortCtl.abort(),
+    runId: null,
+  };
+
+  void (async () => {
+    ctx.dispatch({ type: "SET_AGENT_THINKING", thinking: true });
+    let silence: SilenceTimer | null = null;
+    try {
+      if (!ctx.connection) {
+        ctx.dispatch({
+          type: "ADD_MESSAGE",
+          message: {
+            data_product_id: "live",
+            step: ctx.currentStep,
+            message_role: "agent",
+            message_text:
+              "Please connect to a database first — the dashboard analyzer needs your source schema to map the metrics.",
+            timestamp: new Date().toISOString(),
+          } as any,
+        });
+        return;
+      }
+
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        Accept: "text/event-stream",
+        "X-DSA-Session-ID": ctx.sessionId,
+      };
+      if (isAuthEnabled()) {
+        const idToken = getIdToken();
+        if (idToken) headers.Authorization = `Bearer ${idToken}`;
+      }
+
+      const body: DashboardRequest = {
+        image_data: imageData,
+        connection: ctx.connection as NonNullable<typeof ctx.connection>,
+        user_message: userMessage || "Analyze this dashboard",
+      };
+
+      const response = await fetch(`${BACKEND_URL}/workflow/dashboard`, {
+        method: "POST",
+        signal: abortCtl.signal,
+        headers,
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        const text = await response.text().catch(() => "");
+        ctx.dispatch({
+          type: "ADD_MESSAGE",
+          message: {
+            data_product_id: "live",
+            step: ctx.currentStep,
+            message_role: "agent",
+            message_text: `Dashboard analysis failed (HTTP ${response.status}): ${text || response.statusText}`,
+            timestamp: new Date().toISOString(),
+          } as any,
+        });
+        return;
+      }
+
+      controller.runId = response.headers.get("X-Run-Id");
+      silence = new SilenceTimer(() => {
+        abortCtl.abort(new DOMException("Silence timeout", "TimeoutError"));
+      });
+
+      for await (const event of streamEvents(response, silence)) {
+        handleEvent(event, ctx);
+      }
+    } catch (err) {
+      if (abortCtl.signal.aborted) return;
+      const message = err instanceof Error ? err.message : String(err);
+      console.error("runDashboard error:", message);
+      ctx.dispatch({
+        type: "ADD_MESSAGE",
+        message: {
+          data_product_id: "live",
+          step: ctx.currentStep,
+          message_role: "agent",
+          message_text: `⚠️ Dashboard analysis failed: ${message}`,
           timestamp: new Date().toISOString(),
         } as any,
       });

@@ -47,7 +47,6 @@ export default function MessageBubble({ message }: MessageBubbleProps) {
           padding: "10px 14px",
           borderRadius: "10px",
           lineHeight: 1.6,
-          whiteSpace: "pre-wrap",
           color: theme.colors.textPrimary,
           ...(isAgent
             ? {
@@ -59,7 +58,22 @@ export default function MessageBubble({ message }: MessageBubbleProps) {
               }),
         }}
       >
-        {message.message_text}
+        {/* Dashboard screenshot attached to user message */}
+        {!isAgent && message.image_data && (
+          <img
+            src={message.image_data}
+            alt="dashboard"
+            style={{
+              maxWidth: "100%",
+              borderRadius: "6px",
+              marginBottom: message.message_text ? "8px" : 0,
+              display: "block",
+            }}
+          />
+        )}
+        {message.message_text && (
+          <span style={{ whiteSpace: "pre-wrap" }}>{message.message_text}</span>
+        )}
       </div>
     </div>
   );

@@ -64,7 +64,7 @@ export default function ChatPanel() {
     scrollToBottom();
   }, [messages.length, state.ui.isAgentThinking, scrollToBottom]);
 
-  const handleSend = (text: string) => {
+  const handleSend = (text: string, imageData?: string) => {
     dispatch({
       type: "ADD_MESSAGE",
       message: {
@@ -73,7 +73,8 @@ export default function ChatPanel() {
         message_role: "user",
         message_text: text,
         timestamp: new Date().toISOString(),
-      },
+        ...(imageData ? { image_data: imageData } : {}),
+      } as any,
     });
   };
 

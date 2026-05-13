@@ -78,6 +78,10 @@ export interface ConversationMessage {
   // UI-only fields (not persisted):
   suggested_replies?: string[];
   source_context?: SourceContext;
+  // R1/R2 rich-rendering flag — tells MessageBubble to render JSX instead of plain text.
+  message_kind?: 'translated_r1' | 'follow_up_r1';
+  // Dashboard reverse-engineering: base64 data URL attached to the user message.
+  image_data?: string;
 }
 
 // --- Quality Flags (quality_flags sheet/table) ---
@@ -348,6 +352,12 @@ export interface StepRequest {
   prior_artifact: PriorArtifact | null;
   connection: SourceConnection | null;
   resume: boolean;
+}
+
+export interface DashboardRequest {
+  image_data: string;
+  connection: SourceConnection;
+  user_message: string;
 }
 
 // --- SSE event payloads (v1, mirrors backend events.py) ---

@@ -26,6 +26,7 @@ from fastapi.middleware.cors import CORSMiddleware
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 load_dotenv(_REPO_ROOT / ".env", override=False)
 
+from .routes_dashboard import router as dashboard_router
 from .routes_discover import router as discover_router
 from .routes_health import router as health_router
 from .routes_query import router as query_router
@@ -88,6 +89,7 @@ def create_app() -> FastAPI:
 
     app.include_router(health_router)
     app.include_router(workflow_router)
+    app.include_router(dashboard_router)
     app.include_router(query_router)
     app.include_router(discover_router)
     app.include_router(workspace_router)
