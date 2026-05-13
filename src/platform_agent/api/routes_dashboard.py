@@ -31,6 +31,8 @@ class DashboardRequest(BaseModel):
     image_data: str = Field(description="Base64 data URL: 'data:image/png;base64,...'")
     connection: SourceConnection
     user_message: str = "Analyze this dashboard"
+    sigma_workbook_name: str | None = None
+    sigma_sql: str | None = None
 
 
 @router.post("/workflow/dashboard")

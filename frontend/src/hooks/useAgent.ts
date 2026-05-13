@@ -319,10 +319,19 @@ export function runDashboard(
         if (idToken) headers.Authorization = `Bearer ${idToken}`;
       }
 
+      const defaultMsg = "Analyze this dashboard";
+      const effectiveMessage = userMessage || defaultMsg;
+      // If the user typed something other than the default prompt, treat it as
+      // a workbook name hint — Sigma workbook names are typically short phrases
+      // ("Q1 Pipeline Review", "ARR by Rep"). Full SQL pastes are not yet
+      // collected by the UI; sigma_sql remains undefined until a textarea is added.
+      const isCustomMessage =
+        effectiveMessage.trim().toLowerCase() !== defaultMsg.toLowerCase();
       const body: DashboardRequest = {
         image_data: imageData,
         connection: ctx.connection as NonNullable<typeof ctx.connection>,
-        user_message: userMessage || "Analyze this dashboard",
+        user_message: effectiveMessage,
+        ...(isCustomMessage && { sigma_workbook_name: effectiveMessage.trim() }),
       };
 
       const response = await fetch(`${BACKEND_URL}/workflow/dashboard`, {

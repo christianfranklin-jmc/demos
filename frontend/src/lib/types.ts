@@ -358,6 +358,8 @@ export interface DashboardRequest {
   image_data: string;
   connection: SourceConnection;
   user_message: string;
+  sigma_workbook_name?: string;
+  sigma_sql?: string;
 }
 
 // --- SSE event payloads (v1, mirrors backend events.py) ---
