@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Explain My Number — Apex SaaS RevOps</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #09090f;
+      color: #e2e4ef;
+      font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+      min-height: 100vh;
+      padding: 40px 24px 100px;
+    }
+
+    #app { max-width: 1080px; margin: 0 auto; }
+
+    @keyframes slideDown {
+      from { opacity: 0; transform: translateY(-10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0; }
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    @keyframes shimmer {
+      0%   { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+    @keyframes barIn {
+      from { width: 0; }
+    }
+
+    .metric-tile {
+      background: #11121b;
+      border: 1px solid #1c1e2e;
+      border-radius: 14px;
+      padding: 22px 24px 18px;
+      cursor: pointer;
+      transition: border-color 180ms, transform 150ms, box-shadow 180ms;
+      user-select: none;
+    }
+    .metric-tile:hover {
+      border-color: #2a2d45;
+      transform: translateY(-2px);
+      box-shadow: 0 10px 28px rgba(0,0,0,0.35);
+    }
+    .metric-tile.selected {
+      border-color: #6366f1;
+      box-shadow: 0 0 0 1px #6366f155, 0 8px 32px rgba(99,102,241,0.12);
+    }
+
+    .cursor {
+      display: inline-block;
+      width: 2px;
+      height: 1.1em;
+      background: #a78bfa;
+      margin-left: 1px;
+      vertical-align: text-bottom;
+      animation: blink 700ms step-end infinite;
+    }
+
+    .progress-track {
+      background: #1c1e2e;
+      border-radius: 3px;
+      height: 5px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      border-radius: 3px;
+      animation: barIn 600ms cubic-bezier(.4,0,.2,1) both;
+    }
+
+    .explain-panel { animation: slideDown 280ms ease; }
+    .drivers-in    { animation: fadeIn 350ms ease; }
+    .sql-in        { animation: fadeIn 450ms ease; }
+
+    .shimmer-row {
+      background: linear-gradient(90deg,#1c1e2e 0%,#252840 50%,#1c1e2e 100%);
+      background-size: 200% 100%;
+      animation: shimmer 1.3s infinite;
+      border-radius: 4px;
+      height: 5px;
+    }
+
+    .sql-block {
+      font-family: 'SF Mono','Fira Code','Consolas',monospace;
+      font-size: 12px;
+      line-height: 1.65;
+      color: #5a6080;
+      background: #0c0d14;
+      border: 1px solid #1c1e2e;
+      border-radius: 10px;
+      padding: 14px 18px;
+      white-space: pre;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script type="module">
+    import React, { useState, useEffect, useRef, useCallback } from 'https://esm.sh/react@18';
+    import { createRoot } from 'https://esm.sh/react-dom@18/client';
+    import htm from 'https://esm.sh/htm@3';
+
+    const html = htm.bind(React.createElement);
+
+    // ─── Data ───────────────────────────────────────────────────────────────────
+
+    const METRICS = {
+      arr: {
+        id: 'arr',
+        short: 'ARR',
+        label: 'Annual Recurring Revenue',
+        value: '$24.8M',
+        delta: '+12% QoQ',
+        good: 'up',
+        trend: 'up',
+        narrative:
+`ARR reached $24.8M this quarter, up 12% from $22.1M in Q4 2025. Growth is broad-based but disproportionately driven by the Mid-Market segment, which expanded 18% quarter-over-quarter as three large upsells closed in February.
+
+The Enterprise tier held steady at $14.2M — no new logos, but solid expansion. SMB continues to drag: 23 logos churned representing $380K in lost ARR, though this is an improvement over Q3's $510K loss.
+
+The cohort analysis looks encouraging. The Q1 2025 cohort is at 112% NRR at its 12-month mark — the strongest cohort performance in two years. At the current trajectory, $30M ARR is achievable by Q4 2026.`,
+        drivers: [
+          { label: 'Mid-Market Expansion',  value: '+$1.8M',  pct: 67, pos: true  },
+          { label: 'Enterprise New Logos',  value: '+$0.5M',  pct: 19, pos: true  },
+          { label: 'SMB Churn',             value: '−$0.4M',  pct: 15, pos: false },
+        ],
+        sql:
+`SELECT segment,
+       SUM(arr_delta)          AS arr_change,
+       COUNT(DISTINCT acct_id) AS accounts
+FROM   arr_movements
+WHERE  quarter = 'Q1-2026'
+GROUP  BY segment
+ORDER  BY arr_change DESC`,
+      },
+
+      pipeline: {
+        id: 'pipeline',
+        short: 'Pipeline',
+        label: 'Pipeline Coverage',
+        value: '3.2×',
+        delta: '−0.4× QoQ',
+        good: 'up',
+        trend: 'down',
+        narrative:
+`Pipeline coverage declined to 3.2× from 3.6× last quarter — below the 3.5× target for the first time in five quarters. Top-of-funnel is not the problem: MQL volume is up 22% year-over-year.
+
+The constraint is Stage 2→3 conversion, which fell from 41% to 33% this quarter. Four Financial Services deals totaling $1.9M have stalled in Stage 2 for 45+ days pending procurement committee reviews. Excluding those four deals, coverage would be 3.8×.
+
+The forward signal is positive. $8.2M in Stage 1 opportunities were added in March alone — 47% ahead of last year's pace. Q2 coverage is tracking toward 4.0× if Stage 2→3 conversion recovers to the 38% historical baseline.`,
+        drivers: [
+          { label: 'Stage 2→3 conversion drop', value: '33% (was 41%)', pct: 80, pos: false },
+          { label: 'Stalled FinServ deals',      value: '$1.9M blocked',  pct: 55, pos: false },
+          { label: 'New Q1 pipeline added',      value: '+$8.2M',         pct: 47, pos: true  },
+        ],
+        sql:
+`SELECT stage,
+       COUNT(*)      AS deals,
+       SUM(amount)   AS pipeline_value
+FROM   opportunities
+WHERE  close_date BETWEEN '2026-04-01' AND '2026-06-30'
+  AND  status = 'open'
+GROUP  BY stage
+ORDER  BY stage`,
+      },
+
+      win_rate: {
+        id: 'win_rate',
+        short: 'Win Rate',
+        label: 'Win Rate',
+        value: '23%',
+        delta: '+3pp QoQ',
+        good: 'up',
+        trend: 'up',
+        narrative:
+`Win rate improved to 23% this quarter — the highest since Q2 2024 and 3 percentage points above Q4's result. The improvement is directly attributable to the competitive displacement playbook launched in January.
+
+The new objection-handling framework for deals involving Competitor X is working. Competitive losses to Competitor X dropped from 38% of all competitive losses down to 22%. Gains are concentrated in the $50K–$150K deal range, where win rates jumped from 19% to 31%.
+
+Enterprise deals (>$150K) remain challenging at a 12% win rate, constrained by longer cycles and incumbent advantage. No-decision rates held steady at 18% — a healthy sign we're not chasing deals we shouldn't be in.`,
+        drivers: [
+          { label: 'Mid-Market  ($50K–$150K)', value: '31% win rate', pct: 78, pos: true  },
+          { label: 'SMB  (< $50K)',            value: '28% win rate', pct: 70, pos: true  },
+          { label: 'Enterprise  (> $150K)',    value: '12% win rate', pct: 30, pos: false },
+        ],
+        sql:
+`SELECT deal_size_tier,
+       ROUND(100.0 * SUM(CASE WHEN outcome='won' THEN 1 ELSE 0 END)
+             / COUNT(*), 1) AS win_rate_pct,
+       COUNT(*) AS total_deals
+FROM   closed_opportunities
+WHERE  close_date >= '2026-01-01'
+GROUP  BY deal_size_tier
+ORDER  BY win_rate_pct DESC`,
+      },
+
+      nrr: {
+        id: 'nrr',
+        short: 'NRR',
+        label: 'Net Revenue Retention',
+        value: '108%',
+        delta: '+2pp QoQ',
+        good: 'up',
+        trend: 'up',
+        narrative:
+`Net Revenue Retention reached 108% — three points above the 105% annual target and up from 106% in Q4 2025. This is the sixth consecutive quarter where net expansion has outpaced gross churn.
+
+The primary driver is seat growth. Average seats per account rose 14% to 31 seats following the Q4 product release, which unlocked new use cases for power users. The Professional Services attach rate on expansion deals is now 67%, which historically correlates with 40% lower churn in the subsequent 12 months.
+
+One risk to flag: 18 mid-market accounts are still on legacy pricing. Their renewals come up in Q3 and represent $2.4M in ARR. Migration to new pricing will either drive meaningful expansion or trigger pushback — a targeted success playbook is in progress.`,
+        drivers: [
+          { label: 'Seat expansion',          value: '+$1.6M', pct: 73, pos: true  },
+          { label: 'Tier upgrades / upsell',  value: '+$0.7M', pct: 32, pos: true  },
+          { label: 'Downgrades',              value: '−$0.5M', pct: 23, pos: false },
+        ],
+        sql:
+`SELECT account_id, account_name,
+       beginning_arr, expansion_arr, churn_arr,
+       ROUND((beginning_arr + expansion_arr - churn_arr)
+             / beginning_arr * 100, 1) AS nrr_pct
+FROM   arr_waterfall
+WHERE  quarter = 'Q1-2026'
+ORDER  BY nrr_pct DESC
+LIMIT  20`,
+      },
+
+      churn: {
+        id: 'churn',
+        short: 'Gross Churn',
+        label: 'Gross Churn Rate',
+        value: '4.2%',
+        delta: '−0.8pp QoQ',
+        good: 'down',
+        trend: 'down',
+        narrative:
+`Gross churn of 4.2% is the best result in six quarters, down from 5.0% in Q4 2025 and well below the 5.5% budget assumption. The improvement is structural, not cyclical.
+
+Churn is concentrated in the sub-$10K ARR SMB tier — 87% of churned logos but only 23% of churned ARR dollars. Enterprise tier churn was 0.3%: a single customer at $85K ARR lost due to an acquisition, not a competitive displacement.
+
+The Health & Wellness vertical, which had elevated churn throughout H2 2025, returned to zero churns in Q1 following a targeted success program launched in November. Primary churn reasons remain budget constraints (44%) and product fit (31%) — both addressable through the Q2 customer journey initiative.`,
+        drivers: [
+          { label: 'SMB < $10K ARR  (18 logos)', value: '87% of logos', pct: 87, pos: false },
+          { label: 'Mid-Market  (2 logos)',       value: '10% of logos', pct: 10, pos: false },
+          { label: 'Enterprise  (1 logo, $85K)',  value: '3% of logos',  pct: 3,  pos: false },
+        ],
+        sql:
+`SELECT tier, churn_reason,
+       COUNT(*)    AS churned_logos,
+       SUM(arr)    AS churned_arr
+FROM   churned_accounts
+WHERE  churn_date BETWEEN '2026-01-01' AND '2026-03-31'
+GROUP  BY tier, churn_reason
+ORDER  BY churned_arr DESC`,
+      },
+
+      new_arr: {
+        id: 'new_arr',
+        short: 'New ARR',
+        label: 'New Logo ARR',
+        value: '$2.1M',
+        delta: '≈ flat QoQ',
+        good: 'up',
+        trend: 'neutral',
+        narrative:
+`New ARR of $2.1M is essentially flat versus Q4 2025's $2.0M and slightly below the $2.4M budget target. This is a capacity story, not a demand story — and the forward indicators are strong.
+
+Five new Account Executives hired in Q4 are still ramping. Average tenure is 3.4 months against a typical 5–6 month ramp cycle. The two AEs who completed ramp in February closed $280K each in March alone, well above quota. Modeling the current cohort's ramp curve, new ARR should reach $3.2M in Q2 and $3.8M in Q3.
+
+Average contract value for new logos ticked up to $48K — the highest on record — driven by tighter ICP qualification. Q2 pipeline supporting new ARR is 47% larger year-over-year.`,
+        drivers: [
+          { label: 'Fully-ramped AEs  (7 reps)', value: '$1.85M', pct: 88, pos: true },
+          { label: 'Ramping AEs  (5 reps)',       value: '$0.25M', pct: 12, pos: true },
+          { label: 'Avg contract value',          value: '$48K ↑', pct: 15, pos: true },
+        ],
+        sql:
+`SELECT rep_id, rep_name, tenure_months,
+       SUM(new_arr)              AS new_arr_closed,
+       COUNT(DISTINCT acct_id)   AS new_logos
+FROM   new_logo_bookings
+WHERE  close_date >= '2026-01-01'
+GROUP  BY rep_id, rep_name, tenure_months
+ORDER  BY new_arr_closed DESC`,
+      },
+    };
+
+    const ORDER = ['arr', 'pipeline', 'win_rate', 'nrr', 'churn', 'new_arr'];
+
+    // ─── Colour helpers ──────────────────────────────────────────────────────────
+
+    function deltaColor(metric) {
+      if (metric.trend === 'neutral') return '#4a4e6a';
+      const good = metric.trend === metric.good;
+      return good ? '#4ade80' : '#fb923c';
+    }
+
+    function deltaIcon(metric) {
+      if (metric.trend === 'up')      return '↑';
+      if (metric.trend === 'down')    return '↓';
+      return '→';
+    }
+
+    // ─── Components ─────────────────────────────────────────────────────────────
+
+    function Header() {
+      return html`
+        <div style=${{ marginBottom: '36px' }}>
+          <div style=${{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'6px' }}>
+            <div style=${{ display:'flex', alignItems:'center', gap:'12px' }}>
+              <div style=${{
+                width:'34px', height:'34px', borderRadius:'9px',
+                background:'linear-gradient(135deg,#6366f1,#8b5cf6)',
+                display:'flex', alignItems:'center', justifyContent:'center',
+                fontSize:'16px', flexShrink: 0,
+              }}>✦</div>
+              <h1 style=${{ fontSize:'21px', fontWeight:'650', color:'#eceeff', letterSpacing:'-0.4px' }}>
+                RevOps Intelligence
+              </h1>
+            </div>
+            <div style=${{ display:'flex', alignItems:'center', gap:'10px' }}>
+              <span style=${{ fontSize:'12px', color:'#3a3d58', fontVariantNumeric:'tabular-nums' }}>Q1 2026</span>
+              <div style=${{
+                display:'flex', alignItems:'center', gap:'5px',
+                background:'rgba(74,222,128,0.07)',
+                border:'1px solid rgba(74,222,128,0.18)',
+                borderRadius:'20px', padding:'3px 10px',
+              }}>
+                <div style=${{ width:'6px', height:'6px', borderRadius:'50%', background:'#4ade80', boxShadow:'0 0 6px #4ade80' }}></div>
+                <span style=${{ fontSize:'11px', color:'#4ade80', fontWeight:'600', letterSpacing:'0.4px' }}>LIVE</span>
+              </div>
+            </div>
+          </div>
+          <p style=${{ fontSize:'12px', color:'#2e3050', marginLeft:'46px', letterSpacing:'0.1px' }}>
+            Apex SaaS · Snowflake PROD · <span style=${{ fontFamily:'monospace' }}>apex_analytics.mart_revops_summary</span>
+          </p>
+        </div>
+      `;
+    }
+
+    function Tile({ metric, selected, onClick }) {
+      const [hov, setHov] = useState(false);
+      const col = deltaColor(metric);
+      const icon = deltaIcon(metric);
+
+      return html`
+        <div
+          className=${'metric-tile' + (selected ? ' selected' : '')}
+          onClick=${onClick}
+          onMouseEnter=${() => setHov(true)}
+          onMouseLeave=${() => setHov(false)}
+        >
+          <div style=${{ fontSize:'10.5px', color:'#333655', fontWeight:'600',
+            letterSpacing:'0.9px', textTransform:'uppercase', marginBottom:'14px' }}>
+            ${metric.label}
+          </div>
+          <div style=${{ display:'flex', alignItems:'flex-end', justifyContent:'space-between', marginBottom:'14px' }}>
+            <div style=${{ fontSize:'34px', fontWeight:'700', color:'#eceeff', letterSpacing:'-1.5px', lineHeight:1 }}>
+              ${metric.value}
+            </div>
+            <div style=${{
+              fontSize:'11px', fontWeight:'600', color: col,
+              background: col + '18',
+              border: '1px solid ' + col + '30',
+              borderRadius:'20px', padding:'3px 9px', whiteSpace:'nowrap', marginBottom:'2px',
+            }}>
+              ${icon} ${metric.delta}
+            </div>
+          </div>
+          <div style=${{
+            height:'2px', borderRadius:'2px',
+            background: selected ? '#6366f1' : hov ? '#2a2d45' : '#181a28',
+            transition:'background 180ms',
+          }}></div>
+        </div>
+      `;
+    }
+
+    function Grid({ selected, onSelect }) {
+      return html`
+        <div style=${{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'12px', marginBottom:'20px' }}>
+          ${ORDER.map(id => html`
+            <${Tile}
+              key=${id}
+              metric=${METRICS[id]}
+              selected=${selected === id}
+              onClick=${() => onSelect(selected === id ? null : id)}
+            />
+          `)}
+        </div>
+      `;
+    }
+
+    function Hint({ visible }) {
+      if (!visible) return null;
+      return html`
+        <div style=${{
+          textAlign:'center', padding:'18px', color:'#2a2d45', fontSize:'13px',
+          display:'flex', alignItems:'center', justifyContent:'center', gap:'8px',
+        }}>
+          <span style=${{ fontSize:'15px' }}>↑</span>
+          Click any metric above to explain it
+        </div>
+      `;
+    }
+
+    function Drivers({ drivers }) {
+      return html`
+        <div className="drivers-in">
+          <div style=${{ fontSize:'10.5px', color:'#333655', fontWeight:'600',
+            letterSpacing:'0.9px', textTransform:'uppercase', marginBottom:'16px' }}>
+            Key Drivers
+          </div>
+          <div style=${{ display:'flex', flexDirection:'column', gap:'16px' }}>
+            ${drivers.map((d, i) => html`
+              <div key=${i}>
+                <div style=${{ display:'flex', justifyContent:'space-between', marginBottom:'7px' }}>
+                  <span style=${{ fontSize:'12px', color:'#6b6e8a', lineHeight:1.4 }}>${d.label}</span>
+                  <span style=${{
+                    fontSize:'12px', fontWeight:'600',
+                    color: d.pos ? '#4ade80' : '#fb923c',
+                    marginLeft:'12px', whiteSpace:'nowrap',
+                  }}>${d.value}</span>
+                </div>
+                <div className="progress-track">
+                  <div className="progress-fill" style=${{
+                    width: d.pct + '%',
+                    background: d.pos
+                      ? 'linear-gradient(90deg,#16a34a,#4ade80)'
+                      : 'linear-gradient(90deg,#ea580c,#fb923c)',
+                  }}></div>
+                </div>
+              </div>
+            `)}
+          </div>
+        </div>
+      `;
+    }
+
+    function DriversPlaceholder() {
+      return html`
+        <div style=${{ display:'flex', flexDirection:'column', gap:'16px' }}>
+          ${[80, 55, 30].map((w, i) => html`
+            <div key=${i} style=${{ display:'flex', flexDirection:'column', gap:'8px' }}>
+              <div className="shimmer-row" style=${{ width: w+'%', opacity:0.4 }}></div>
+              <div className="shimmer-row" style=${{ opacity:0.25 }}></div>
+            </div>
+          `)}
+        </div>
+      `;
+    }
+
+    function Narrative({ text, onDone }) {
+      const [phase, setPhase]       = useState('scan');   // scan | stream | done
+      const [displayed, setShown]   = useState('');
+      const charRef                  = useRef(0);
+      const onDoneRef                = useRef(onDone);
+      onDoneRef.current              = onDone;
+
+      useEffect(() => {
+        setPhase('scan');
+        setShown('');
+        charRef.current = 0;
+
+        const scanTimer = setTimeout(() => {
+          setPhase('stream');
+          const iv = setInterval(() => {
+            charRef.current += 3;
+            if (charRef.current >= text.length) {
+              charRef.current = text.length;
+              setShown(text);
+              setPhase('done');
+              clearInterval(iv);
+              if (onDoneRef.current) onDoneRef.current();
+            } else {
+              setShown(text.slice(0, charRef.current));
+            }
+          }, 16);
+          return () => clearInterval(iv);
+        }, 750);
+
+        return () => clearTimeout(scanTimer);
+      }, [text]);
+
+      if (phase === 'scan') return html`
+        <div style=${{ display:'flex', alignItems:'center', gap:'10px', color:'#2e3050', fontSize:'13px', paddingTop:'4px' }}>
+          <div style=${{
+            width:'15px', height:'15px', borderRadius:'50%',
+            border:'2px solid #1c1e2e', borderTopColor:'#6366f1',
+            animation:'spin 550ms linear infinite', flexShrink:0,
+          }}></div>
+          Querying warehouse…
+        </div>
+      `;
+
+      return html`
+        <div style=${{ fontSize:'14px', lineHeight:1.8, color:'#9295b0', whiteSpace:'pre-wrap' }}>
+          ${displayed}${phase === 'stream' ? html`<span className="cursor"></span>` : ''}
+        </div>
+      `;
+    }
+
+    function Panel({ metricId, onClose }) {
+      const m = METRICS[metricId];
+      const [showDrivers, setShowDrivers] = useState(false);
+      const [showSql, setShowSql]         = useState(false);
+
+      useEffect(() => {
+        setShowDrivers(false);
+        setShowSql(false);
+        const t = setTimeout(() => setShowDrivers(true), 1100);
+        return () => clearTimeout(t);
+      }, [metricId]);
+
+      const handleDone = useCallback(() => {
+        setTimeout(() => setShowSql(true), 350);
+      }, []);
+
+      const col = deltaColor(m);
+
+      return html`
+        <div className="explain-panel" style=${{
+          background:'#0e0f18',
+          border:'1px solid #1c1e2e',
+          borderRadius:'16px',
+          overflow:'hidden',
+        }}>
+
+          ${/* ── panel header ── */}
+          <div style=${{
+            padding:'14px 22px',
+            borderBottom:'1px solid #161826',
+            display:'flex', alignItems:'center', justifyContent:'space-between',
+          }}>
+            <div style=${{ display:'flex', alignItems:'center', gap:'10px' }}>
+              <div style=${{
+                width:'8px', height:'8px', borderRadius:'50%',
+                background: col, boxShadow:'0 0 8px ' + col,
+              }}></div>
+              <span style=${{ fontSize:'13px', color:'#c8cadf', fontWeight:'500' }}>
+                Explaining${' '}<strong style=${{ color:'#eceeff' }}>${m.short}</strong>${': ' + m.value}
+              </span>
+            </div>
+            <div style=${{ display:'flex', alignItems:'center', gap:'16px' }}>
+              <span style=${{
+                fontSize:'11px', color:'#252740', fontFamily:'monospace',
+              }}>mart_revops_summary</span>
+              <button onClick=${onClose} style=${{
+                background:'none', border:'none', cursor:'pointer',
+                color:'#333655', fontSize:'16px', lineHeight:1, padding:'0 2px',
+                transition:'color 150ms',
+              }}
+              onMouseEnter=${e => e.target.style.color='#6b6e8a'}
+              onMouseLeave=${e => e.target.style.color='#333655'}
+              >×</button>
+            </div>
+          </div>
+
+          ${/* ── body ── */}
+          <div style=${{
+            padding:'26px 26px 22px',
+            display:'grid', gridTemplateColumns:'1fr 300px', gap:'36px',
+          }}>
+            <${Narrative} key=${metricId} text=${m.narrative} onDone=${handleDone} />
+            ${showDrivers
+              ? html`<${Drivers} drivers=${m.drivers} />`
+              : html`<${DriversPlaceholder} />`
+            }
+          </div>
+
+          ${/* ── SQL footer ── */}
+          ${showSql ? html`
+            <div className="sql-in" style=${{ padding:'0 26px 26px' }}>
+              <div style=${{
+                fontSize:'10.5px', color:'#2a2d45', fontWeight:'600',
+                letterSpacing:'0.8px', textTransform:'uppercase',
+                marginBottom:'10px',
+                display:'flex', alignItems:'center', gap:'10px',
+              }}>
+                <span>SQL Executed</span>
+                <div style=${{ flex:1, height:'1px', background:'#161826' }}></div>
+              </div>
+              <pre className="sql-block">${m.sql}</pre>
+            </div>
+          ` : ''}
+
+        </div>
+      `;
+    }
+
+    function App() {
+      const [sel, setSel] = useState(null);
+
+      return html`
+        <div>
+          <${Header} />
+          <${Grid} selected=${sel} onSelect=${setSel} />
+          <${Hint} visible=${sel === null} />
+          ${sel !== null ? html`
+            <${Panel} key=${sel} metricId=${sel} onClose=${() => setSel(null)} />
+          ` : ''}
+        </div>
+      `;
+    }
+
+    createRoot(document.getElementById('app')).render(html`<${App} />`);
+  </script>
+</body>
+</html>
